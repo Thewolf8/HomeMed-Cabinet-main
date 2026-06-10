@@ -32,9 +32,9 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      # Sync Capacitor with Android
+      # تم الإصلاح هنا: استخدام المسار الرسمي للمكتبة لمنع خطأ npm error
       - name: Sync Capacitor Android
-        run: npx cap sync android
+        run: npx @capacitor/cli sync android
 
       # Setup Java 21
       - name: Setup Java
@@ -54,7 +54,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # خطوة الحل الجديدة: حقن كود لتوحيد وإصلاح تضارب مكتبات كوتلن المكررة
+      # خطوة الحل: حقن كود لتوحيد وإصلاح تضارب مكتبات كوتلن المكررة
       - name: Fix Kotlin Duplicate Dependencies Conflict
         run: |
           echo "" >> android/app/build.gradle
