@@ -1,0 +1,163 @@
+/* HomeMed Cabinet - App Styles */
+
+/* RTL Support */
+.rtl {
+  direction: rtl;
+}
+
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Hide scrollbar on mobile */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Glass effect for cards */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Medicine card hover */
+.medicine-card {
+  transition: all 0.2s ease;
+}
+.medicine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode overrides */
+.dark .glass-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Expired card styling */
+.medicine-card-expired {
+  border-color: hsl(var(--destructive) / 0.3);
+  background: linear-gradient(135deg, hsl(var(--destructive) / 0.05) 0%, transparent 100%);
+}
+
+/* Input date styling for dark mode */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+  cursor: pointer;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+/* Ensure proper touch targets on mobile */
+@media (max-width: 768px) {
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
+
+/* Toast positioning for mobile */
+@media (max-width: 768px) {
+  [data-sonner-toaster] {
+    left: 16px !important;
+    right: 16px !important;
+    bottom: 80px !important;
+  }
+}
+
+/* RTL specific */
+.rtl .space-x-2 > * + * {
+  --tw-space-x-reverse: 1;
+}
+.rtl .space-x-3 > * + * {
+  --tw-space-x-reverse: 1;
+}
+.rtl .space-x-4 > * + * {
+  --tw-space-x-reverse: 1;
+}
+.rtl .ml-auto {
+  margin-left: 0;
+  margin-right: auto;
+}
+.rtl .mr-auto {
+  margin-right: 0;
+  margin-left: auto;
+}
+.rtl .text-left {
+  text-align: right;
+}
+.rtl .text-right {
+  text-align: left;
+}
