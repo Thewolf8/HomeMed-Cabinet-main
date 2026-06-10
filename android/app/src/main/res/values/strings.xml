@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HomeMed Cabinet</string>
+    <string name="title_activity_main">HomeMed Cabinet</string>
+    <string name="package_name">com.homemed.cabinet</string>
+    <string name="custom_url_scheme">com.homemed.cabinet</string>
+</resources>

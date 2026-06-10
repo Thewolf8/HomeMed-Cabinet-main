@@ -1,0 +1,18 @@
+{
+	"appId": "com.homemed.cabinet",
+	"appName": "HomeMed Cabinet",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"android": {},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"backgroundColor": "#1E293B",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": true,
+			"spinnerColor": "#5F9E95"
+		}
+	}
+}
