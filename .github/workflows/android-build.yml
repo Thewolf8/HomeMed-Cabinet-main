@@ -36,6 +36,12 @@ jobs:
       - name: Sync Capacitor Android
         run: npx @capacitor/cli sync android
 
+      # ✨ الخطوة المضافة: توليد أيقونات التطبيق تلقائياً من المسار assets/icon.png
+      - name: Generate App Icons from Assets
+        run: |
+          npm install @capacitor/assets
+          npx @capacitor/assets generate --android
+
       # Setup Java 21
       - name: Setup Java
         uses: actions/setup-java@v4
