@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pill,
   AlertTriangle,
@@ -8,12 +9,17 @@ import {
   ArrowRight,
   TrendingUp,
   Activity,
+  ShoppingCart,
+  X,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Medication, DashboardStats } from '@/types/medication';
+import { EMERGENCY_ITEMS } from '@/types/medication';
 import type { Page } from '@/App';
 import { getDaysUntilExpiration } from '@/services/exportService';
 
@@ -32,12 +38,15 @@ interface DashboardPageProps {
   onEdit: (id: string) => void;
 }
 
+type StatFilter = 'all' | 'total' | 'expiringSoon' | 'expired' | 'lowStock';
+
 interface StatCard {
   key: 'expired' | 'expiringSoon' | 'lowStock' | 'total';
   icon: typeof Pill;
   color: string;
   bgColor: string;
   borderColor: string;
+  filter: StatFilter;
 }
 
 const statCards: StatCard[] = [
@@ -47,6 +56,7 @@ const statCards: StatCard[] = [
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/20',
+    filter: 'total',
   },
   {
     key: 'expiringSoon',
@@ -54,6 +64,7 @@ const statCards: StatCard[] = [
     color: 'text-amber-500',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/20',
+    filter: 'expiringSoon',
   },
   {
     key: 'expired',
@@ -61,6 +72,7 @@ const statCards: StatCard[] = [
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500/20',
+    filter: 'expired',
   },
   {
     key: 'lowStock',
@@ -68,6 +80,7 @@ const statCards: StatCard[] = [
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/20',
+    filter: 'lowStock',
   },
 ];
 
@@ -80,6 +93,8 @@ export default function DashboardPage({
   onEdit,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
+  const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -101,6 +116,22 @@ export default function DashboardPage({
     lowStock: stats.lowStock,
   };
 
+  // Filtered medicines based on active stat card
+  const filteredMedicines = (() => {
+    if (!activeFilter || activeFilter === 'all') return [];
+    if (activeFilter === 'total') return medications;
+    if (activeFilter === 'expired')
+      return medications.filter((m) => getDaysUntilExpiration(m.expirationDate) < 0);
+    if (activeFilter === 'expiringSoon')
+      return medications.filter((m) => {
+        const d = getDaysUntilExpiration(m.expirationDate);
+        return d >= 0 && d <= 30;
+      });
+    if (activeFilter === 'lowStock')
+      return medications.filter((m) => m.quantity <= 5);
+    return [];
+  })();
+
   // Get expiring medicines for quick view
   const expiringMedicines = medications
     .filter((m) => {
@@ -110,10 +141,13 @@ export default function DashboardPage({
     .sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime())
     .slice(0, 5);
 
-  // Get emergency medicines
-  const emergencyMedicines = medications
-    .filter((m) => m.category === 'emergency')
-    .slice(0, 5);
+  // Medicines that need renewal: quantity = 0 OR expired
+  const renewalMedicines = medications.filter(
+    (m) => m.quantity === 0 || getDaysUntilExpiration(m.expirationDate) < 0
+  );
+
+  // Emergency medicines with details
+  const emergencyMedicinesOwned = medications.filter((m) => m.category === 'emergency');
 
   const readinessLabel =
     emergencyReadiness.status === 'excellent'
@@ -129,13 +163,17 @@ export default function DashboardPage({
       ? 'text-amber-500'
       : 'text-red-500';
 
+  const handleStatCardClick = (filter: StatFilter) => {
+    setActiveFilter((prev) => (prev === filter ? null : filter));
+  };
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center md:text-left"
+        className="text-center md:text-start"
       >
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t('appName')}</h1>
         <p className="text-muted-foreground">{t('tagline')}</p>
@@ -151,12 +189,15 @@ export default function DashboardPage({
         {statCards.map((card) => {
           const Icon = card.icon;
           const value = statValues[card.key];
+          const isActive = activeFilter === card.filter;
 
           return (
             <motion.div key={card.key} variants={itemVariants}>
               <Card
-                className={`${card.borderColor} border bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-300 cursor-pointer group`}
-                onClick={() => onNavigate('medicines')}
+                className={`${card.borderColor} border bg-card/50 backdrop-blur-sm transition-all duration-300 cursor-pointer group ${
+                  isActive ? 'ring-2 ring-primary/50 bg-card/90' : 'hover:bg-card/80'
+                }`}
+                onClick={() => handleStatCardClick(card.filter)}
               >
                 <CardContent className="p-4 md:p-6">
                   <div className="flex items-start justify-between">
@@ -164,9 +205,9 @@ export default function DashboardPage({
                       <Icon className={`w-5 h-5 ${card.color}`} />
                     </div>
                     <ArrowRight
-                      className={`w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity transform ${
-                        isRTL ? 'rotate-180' : ''
-                      }`}
+                      className={`w-4 h-4 text-muted-foreground transition-all transform ${
+                        isActive ? 'opacity-100 rotate-90' : 'opacity-0 group-hover:opacity-100'
+                      } ${isRTL ? 'rotate-180' : ''}`}
                     />
                   </div>
                   <div className="mt-4">
@@ -185,10 +226,81 @@ export default function DashboardPage({
         })}
       </motion.div>
 
+      {/* Filtered Medicines Panel */}
+      <AnimatePresence>
+        {activeFilter && filteredMedicines.length >= 0 && (
+          <motion.div
+            key="filter-panel"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="border-primary/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">
+                    {activeFilter === 'total' ? t('totalMedicines') :
+                     activeFilter === 'expiringSoon' ? t('expiringSoon') :
+                     activeFilter === 'expired' ? t('expired') :
+                     t('lowStock')}
+                    <span className="ms-2 text-sm font-normal text-muted-foreground">
+                      ({filteredMedicines.length})
+                    </span>
+                  </CardTitle>
+                  <button
+                    onClick={() => setActiveFilter(null)}
+                    className="p-1 rounded-lg hover:bg-accent"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredMedicines.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">{t('noMedicines')}</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {filteredMedicines.map((med) => {
+                      const days = getDaysUntilExpiration(med.expirationDate);
+                      const isExpired = days < 0;
+                      return (
+                        <div
+                          key={med.id}
+                          onClick={() => onEdit(med.id)}
+                          className="flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent cursor-pointer transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{med.name}</p>
+                            <p className="text-xs text-muted-foreground">{med.dosage}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-muted-foreground">x{med.quantity}</span>
+                            {isExpired ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                                {t('expiredTag')}
+                              </span>
+                            ) : activeFilter === 'expiringSoon' ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">
+                                {days}d
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Emergency Readiness */}
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
-          <Card className="h-full">
+          <Card className="h-full cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShowEmergencyModal(true)}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-primary" />
@@ -205,10 +317,11 @@ export default function DashboardPage({
 
               <Progress value={emergencyReadiness.score} className="h-2" />
 
+              {/* RTL-safe labels: always Weak on start, Excellent on end regardless of language */}
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{t('readinessWeak')}</span>
-                <span>{emergencyReadiness.found}/{emergencyReadiness.total}</span>
-                <span>{t('readinessExcellent')}</span>
+                <span className="text-red-400">{t('readinessWeak')}</span>
+                <span className="text-muted-foreground">{emergencyReadiness.found}/{emergencyReadiness.total}</span>
+                <span className="text-emerald-500">{t('readinessExcellent')}</span>
               </div>
 
               {emergencyReadiness.missing.length > 0 && (
@@ -238,10 +351,10 @@ export default function DashboardPage({
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => onNavigate('medicines')}
+                onClick={(e) => { e.stopPropagation(); setShowEmergencyModal(true); }}
               >
-                <Activity className="w-4 h-4 mr-2" />
-                {t('medicines')}
+                <Activity className="w-4 h-4 me-2" />
+                {t('viewEmergencyDetails')}
               </Button>
             </CardContent>
           </Card>
@@ -260,7 +373,7 @@ export default function DashboardPage({
             </CardHeader>
             <CardContent className="space-y-3">
               <Button className="w-full justify-start" onClick={onAddNew}>
-                <Pill className="w-4 h-4 mr-2" />
+                <Pill className="w-4 h-4 me-2" />
                 {t('addMedicine')}
               </Button>
               <Button
@@ -268,7 +381,7 @@ export default function DashboardPage({
                 className="w-full justify-start"
                 onClick={() => onNavigate('export')}
               >
-                <TrendingUp className="w-4 h-4 mr-2" />
+                <TrendingUp className="w-4 h-4 me-2" />
                 {t('exportInventory')}
               </Button>
               <Button
@@ -276,7 +389,7 @@ export default function DashboardPage({
                 className="w-full justify-start"
                 onClick={() => onNavigate('settings')}
               >
-                <Activity className="w-4 h-4 mr-2" />
+                <Activity className="w-4 h-4 me-2" />
                 {t('settings')}
               </Button>
             </CardContent>
@@ -335,62 +448,185 @@ export default function DashboardPage({
         </motion.div>
       </div>
 
-      {/* Emergency Medicines */}
-      {emergencyMedicines.length > 0 && (
-        <motion.div
-          variants={itemVariants}
-          initial="hidden"
-          animate="visible"
-          transition={{ delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-red-500" />
-                {t('emergency')} {t('medicines')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {emergencyMedicines.map((med) => {
+      {/* Needs Renewal / Out of Stock Section */}
+      <motion.div
+        variants={itemVariants}
+        initial="hidden"
+        animate="visible"
+        transition={{ delay: 0.25 }}
+      >
+        <Card className="border-orange-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-orange-500" />
+              {t('needsRenewal')}
+              {renewalMedicines.length > 0 && (
+                <span className="ms-auto text-xs font-normal px-2 py-0.5 bg-orange-500/10 text-orange-500 rounded-full">
+                  {renewalMedicines.length}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {renewalMedicines.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-4 text-emerald-500">
+                <CheckCircle2 className="w-4 h-4" />
+                <p className="text-sm font-medium">{t('noRenewalNeeded')}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {renewalMedicines.map((med) => {
                   const days = getDaysUntilExpiration(med.expirationDate);
                   const isExpired = days < 0;
-                  const isExpiringSoon = days >= 0 && days <= 30;
-
+                  const isOutOfStock = med.quantity === 0;
                   return (
                     <div
                       key={med.id}
                       onClick={() => onEdit(med.id)}
-                      className="p-3 rounded-lg border border-border hover:border-primary/50 cursor-pointer transition-all hover:shadow-md"
+                      className="flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent cursor-pointer transition-colors"
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{med.name}</p>
-                          <p className="text-xs text-muted-foreground">{med.dosage}</p>
-                        </div>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            isExpired
-                              ? 'bg-red-500/10 text-red-500'
-                              : isExpiringSoon
-                              ? 'bg-amber-500/10 text-amber-500'
-                              : 'bg-emerald-500/10 text-emerald-500'
-                          }`}
-                        >
-                          {isExpired ? t('expiredTag') : isExpiringSoon ? `${days}d` : 'OK'}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{med.name}</p>
+                        <p className="text-xs text-muted-foreground">{med.dosage}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('remaining')}: {med.quantity}
-                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isOutOfStock && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                            {t('outOfStock')}
+                          </span>
+                        )}
+                        {isExpired && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                            {t('expiredTag')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Emergency Medicines Detail Modal */}
+      <AnimatePresence>
+        {showEmergencyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowEmergencyModal(false)}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="w-full max-w-md bg-card rounded-2xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-5 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-primary" />
+                  <h2 className="font-bold text-lg">{t('emergencyMedicinesList')}</h2>
+                </div>
+                <button
+                  onClick={() => setShowEmergencyModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-accent"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Readiness bar in modal */}
+              <div className="px-5 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-sm font-medium ${readinessColor}`}>{readinessLabel}</span>
+                  <span className={`text-2xl font-bold ${readinessColor}`}>{emergencyReadiness.score}%</span>
+                </div>
+                <Progress value={emergencyReadiness.score} className="h-2 mb-1" />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span className="text-red-400">{t('readinessWeak')}</span>
+                  <span>{emergencyReadiness.found}/{emergencyReadiness.total}</span>
+                  <span className="text-emerald-500">{t('readinessExcellent')}</span>
+                </div>
+              </div>
+
+              {/* Emergency medicines you own */}
+              <div className="px-5 py-3 max-h-72 overflow-y-auto space-y-3">
+                {emergencyReadiness.missing.length < emergencyReadiness.total && emergencyMedicinesOwned.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {t('emergencyMedicinesOwned')} ({emergencyMedicinesOwned.length})
+                    </p>
+                    <div className="space-y-2">
+                      {emergencyMedicinesOwned.map((med) => {
+                        const days = getDaysUntilExpiration(med.expirationDate);
+                        const isExpired = days < 0;
+                        return (
+                          <div
+                            key={med.id}
+                            onClick={() => { setShowEmergencyModal(false); onEdit(med.id); }}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 hover:border-emerald-500/40 cursor-pointer transition-all"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{med.name}</p>
+                              <p className="text-xs text-muted-foreground">{med.dosage} · x{med.quantity}</p>
+                            </div>
+                            <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                              isExpired ? 'bg-red-500/10 text-red-500' :
+                              days <= 30 ? 'bg-amber-500/10 text-amber-500' :
+                              'bg-emerald-500/10 text-emerald-500'
+                            }`}>
+                              {isExpired ? t('expiredTag') : days <= 30 ? `${days}d` : 'OK'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missing items */}
+                {emergencyReadiness.missing.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" />
+                      {t('emergencyMedicinesMissing')} ({emergencyReadiness.missing.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {emergencyReadiness.missing.map((item) => (
+                        <div
+                          key={item}
+                          className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/5 border border-destructive/20"
+                        >
+                          <XCircle className="w-4 h-4 text-destructive shrink-0" />
+                          <p className="text-sm">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-border flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowEmergencyModal(false)}>
+                  {t('closeDetails')}
+                </Button>
+                <Button className="flex-1" onClick={() => { setShowEmergencyModal(false); onNavigate('medicines'); }}>
+                  {t('medicines')}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

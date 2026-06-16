@@ -4,8 +4,10 @@ import { Capacitor } from '@capacitor/core';
 
 const isNative = Capacitor.isNativePlatform();
 
-// Use Documents directory as it works cross-platform
-const DOWNLOADS_DIR = Directory.Documents;
+// Cache directory works reliably across all Android versions for sharing
+// Documents directory may have permission issues on Android 10
+const SHARE_DIR = Directory.Cache;
+const SAVE_DIR = Directory.Documents;
 
 /**
  * Convert a base64 string to a Blob
@@ -44,7 +46,39 @@ function downloadOnWeb(content: string | Blob, filename: string, mimeType: strin
 }
 
 /**
- * Save file to device and optionally share it
+ * Write file to Cache directory and share it (works on Android 10+)
+ */
+async function writeAndShare(
+  content: string,
+  filename: string,
+  mimeType: string,
+  isBinary: boolean = false
+): Promise<void> {
+  // Write to cache (no external storage permissions needed)
+  await Filesystem.writeFile({
+    path: filename,
+    data: content,
+    directory: SHARE_DIR,
+    encoding: isBinary ? undefined : Encoding.UTF8,
+    recursive: true,
+  });
+
+  // Get URI
+  const fileUri = await Filesystem.getUri({
+    path: filename,
+    directory: SHARE_DIR,
+  });
+
+  // Share — this opens the system share sheet on all Android versions
+  await Share.share({
+    title: filename,
+    url: fileUri.uri,
+    dialogTitle: 'Share Export',
+  });
+}
+
+/**
+ * Save file to device and share it
  */
 export async function saveAndShareFile(
   content: string,
@@ -53,30 +87,9 @@ export async function saveAndShareFile(
 ): Promise<void> {
   if (isNative) {
     try {
-      // Save to Documents directory on native
-      await Filesystem.writeFile({
-        path: filename,
-        data: content,
-        directory: DOWNLOADS_DIR,
-        encoding: mimeType.startsWith('application/pdf') ? undefined : Encoding.UTF8,
-        recursive: true,
-      });
-
-      // Get the URI for sharing
-      const fileUri = await Filesystem.getUri({
-        path: filename,
-        directory: DOWNLOADS_DIR,
-      });
-
-      // Share the file
-      await Share.share({
-        title: filename,
-        text: `HomeMed Cabinet - ${filename}`,
-        url: fileUri.uri,
-        dialogTitle: 'Share Export',
-      });
+      await writeAndShare(content, filename, mimeType, false);
     } catch (error) {
-      console.error('Native file save error:', error);
+      console.error('Native share error:', error);
       // Fallback to web download
       downloadOnWeb(content, filename, mimeType);
     }
@@ -92,26 +105,9 @@ export async function saveAndShareFile(
 export async function savePDFFile(pdfBase64: string, filename: string): Promise<void> {
   if (isNative) {
     try {
-      await Filesystem.writeFile({
-        path: filename,
-        data: pdfBase64,
-        directory: DOWNLOADS_DIR,
-        recursive: true,
-      });
-
-      const fileUri = await Filesystem.getUri({
-        path: filename,
-        directory: DOWNLOADS_DIR,
-      });
-
-      await Share.share({
-        title: filename,
-        text: `HomeMed Cabinet - ${filename}`,
-        url: fileUri.uri,
-        dialogTitle: 'Share PDF',
-      });
+      await writeAndShare(pdfBase64, filename, 'application/pdf', true);
     } catch (error) {
-      console.error('Native PDF save error:', error);
+      console.error('Native PDF share error:', error);
       // Fallback: convert base64 to blob and download
       const blob = base64ToBlob(pdfBase64, 'application/pdf');
       downloadOnWeb(blob, filename, 'application/pdf');
@@ -129,7 +125,7 @@ export async function readFile(path: string): Promise<string> {
   if (isNative) {
     const result = await Filesystem.readFile({
       path,
-      directory: DOWNLOADS_DIR,
+      directory: SAVE_DIR,
       encoding: Encoding.UTF8,
     });
     return result.data as string;

@@ -60,7 +60,7 @@ export interface ExportPreferences {
 }
 
 export type Language = 'en' | 'ar' | 'fr' | 'system';
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'system';
 
 export interface AppSettings {
   language: Language;

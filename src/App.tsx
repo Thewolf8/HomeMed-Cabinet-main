@@ -26,15 +26,6 @@ function AppContent() {
   const medHook = useMedications();
   const { toast } = useToast();
 
-  // Apply theme class
-  useEffect(() => {
-    if (settings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings.theme]);
-
   const navigateTo = (page: Page) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });

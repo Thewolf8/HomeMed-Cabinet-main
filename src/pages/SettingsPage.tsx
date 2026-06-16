@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Upload,
   Check,
+  Monitor,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,12 @@ const languages: { code: Language; label: 'systemDefault' | 'english' | 'arabic'
   { code: 'fr', label: 'french', flag: '', dir: 'ltr' },
 ];
 
+const themeOptions: { value: Theme; labelKey: 'themeLight' | 'themeDark' | 'themeSystem'; icon: typeof Sun }[] = [
+  { value: 'light', labelKey: 'themeLight', icon: Sun },
+  { value: 'dark', labelKey: 'themeDark', icon: Moon },
+  { value: 'system', labelKey: 'themeSystem', icon: Monitor },
+];
+
 export default function SettingsPage({
   onResetData,
   onImport,
@@ -75,7 +82,6 @@ export default function SettingsPage({
       const content = await readFileFromInput(file);
       const data = JSON.parse(content);
 
-      // Validate structure
       if (data.medications && Array.isArray(data.medications)) {
         setImportData(data.medications);
         setShowImportDialog(true);
@@ -89,7 +95,6 @@ export default function SettingsPage({
       toast(t('importError'));
     }
 
-    // Reset input
     e.target.value = '';
   };
 
@@ -108,8 +113,6 @@ export default function SettingsPage({
     toast(t('resetSuccess'));
   };
 
-  const isDark = settings.theme === 'dark';
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -123,24 +126,31 @@ export default function SettingsPage({
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              <Sun className="w-4 h-4" />
               {t('appearance')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${isDark ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Moon className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-medium">{t('darkMode')}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {isDark ? 'Currently active' : 'Switch to dark'}
-                  </p>
-                </div>
-              </div>
-              <Switch checked={isDark} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
+          <CardContent>
+            <div className="grid grid-cols-3 gap-2">
+              {themeOptions.map((opt) => {
+                const Icon = opt.icon;
+                const isActive = settings.theme === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setTheme(opt.value)}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all text-sm font-medium ${
+                      isActive
+                        ? 'bg-primary/10 border-primary/40 text-primary'
+                        : 'border-transparent hover:bg-accent text-muted-foreground'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-xs leading-tight text-center">{t(opt.labelKey)}</span>
+                    {isActive && <Check className="w-3 h-3" />}
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -167,7 +177,7 @@ export default function SettingsPage({
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-lg">{lang.flag}</span>
-                    <div className="text-left">
+                    <div className="text-start">
                       <p className="font-medium text-sm">{t(lang.label)}</p>
                       {lang.code !== 'system' && (
                         <p className="text-xs text-muted-foreground">{lang.dir.toUpperCase()}</p>
@@ -175,7 +185,7 @@ export default function SettingsPage({
                     </div>
                   </div>
                   {language === lang.code && (
-                    <Check className="w-4 h-4 text-primary" />
+                    <Check className="w-4 h-4 text-primary shrink-0" />
                   )}
                 </button>
               ))}

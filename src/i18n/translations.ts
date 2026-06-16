@@ -182,6 +182,25 @@ export const translations = {
     next: 'Next',
     done: 'Done',
     
+    // Appearance themes
+    followSystem: 'Follow System',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'Auto (Follow Device)',
+    
+    // Needs Renewal / Out of Stock
+    needsRenewal: 'Needs Renewal / Purchase',
+    needsRenewalDesc: 'Medicines with zero quantity, expired, or critically low',
+    outOfStock: 'Out of Stock',
+    noRenewalNeeded: 'Everything is stocked',
+    
+    // Emergency detail modal
+    emergencyMedicinesList: 'Emergency Medicines',
+    viewEmergencyDetails: 'View Details',
+    emergencyMedicinesOwned: 'Owned',
+    emergencyMedicinesMissing: 'Missing',
+    closeDetails: 'Close',
+    
     // AI Prompt Footer
     aiPromptTitle: 'AI Analysis Prompt',
     aiPromptDesc: 'Copy this prompt and your export to analyze with your preferred AI assistant.',
@@ -369,6 +388,25 @@ export const translations = {
     back: 'رجوع',
     next: 'التالي',
     done: 'تم',
+    
+    // Appearance themes
+    followSystem: 'تتبع النظام',
+    themeLight: 'فاتح',
+    themeDark: 'داكن',
+    themeSystem: 'تلقائي (تتبع الجهاز)',
+    
+    // Needs Renewal / Out of Stock
+    needsRenewal: 'تحتاج لتجديد / شراء',
+    needsRenewalDesc: 'أدوية نفدت كميتها أو انتهت صلاحيتها أو بلغت الصفر',
+    outOfStock: 'نفد المخزون',
+    noRenewalNeeded: 'كل شيء متوفر',
+    
+    // Emergency detail modal
+    emergencyMedicinesList: 'أدوية الطوارئ',
+    viewEmergencyDetails: 'عرض التفاصيل',
+    emergencyMedicinesOwned: 'متوفر',
+    emergencyMedicinesMissing: 'مفقود',
+    closeDetails: 'إغلاق',
     
     // AI Prompt Footer
     aiPromptTitle: 'موجه تحليل الذكاء الاصطناعي',
@@ -563,5 +601,24 @@ export const translations = {
     aiPromptDesc: 'Copiez ce prompt et votre export pour analyser avec votre assistant IA préféré.',
     copyPrompt: 'Copier le Prompt',
     copied: 'Copié!',
+    
+    // Appearance themes
+    followSystem: 'Suivre le Système',
+    themeLight: 'Clair',
+    themeDark: 'Sombre',
+    themeSystem: 'Auto (Suivre l\'Appareil)',
+    
+    // Needs Renewal / Out of Stock
+    needsRenewal: 'À Renouveler / Acheter',
+    needsRenewalDesc: 'Médicaments épuisés, expirés ou à stock nul',
+    outOfStock: 'En rupture de stock',
+    noRenewalNeeded: 'Tout est en stock',
+    
+    // Emergency detail modal
+    emergencyMedicinesList: 'Médicaments d\'Urgence',
+    viewEmergencyDetails: 'Voir les Détails',
+    emergencyMedicinesOwned: 'Disponible',
+    emergencyMedicinesMissing: 'Manquant',
+    closeDetails: 'Fermer',
   },
 } as const;

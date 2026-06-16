@@ -5,7 +5,7 @@ const SETTINGS_KEY = 'homemed-settings';
 
 const defaultSettings: AppSettings = {
   language: 'system',
-  theme: 'dark',
+  theme: 'system',
   exportPreferences: {
     includeNotes: true,
     includeEmergencySection: true,
@@ -16,7 +16,9 @@ function loadSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
-      return { ...defaultSettings, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      // Migrate old 'dark' default to 'system' if user never explicitly chose
+      return { ...defaultSettings, ...parsed };
     }
   } catch {
     // localStorage not available
@@ -32,19 +34,32 @@ function saveSettingsToStorage(settings: AppSettings): void {
   }
 }
 
+function applyTheme(theme: Theme) {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const shouldBeDark = theme === 'dark' || (theme === 'system' && prefersDark);
+  if (shouldBeDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
   useEffect(() => {
     saveSettingsToStorage(settings);
-    
-    // Apply theme
-    if (settings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    applyTheme(settings.theme);
   }, [settings]);
+
+  // Listen to system theme changes in real-time when theme is 'system'
+  useEffect(() => {
+    if (settings.theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme('system');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [settings.theme]);
 
   const setLanguage = useCallback((language: Language) => {
     setSettings((prev) => ({ ...prev, language }));
