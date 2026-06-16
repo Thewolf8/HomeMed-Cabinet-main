@@ -315,7 +315,7 @@ export default function DashboardPage({
                 <p className={`text-sm font-medium mt-1 ${readinessColor}`}>{readinessLabel}</p>
               </div>
 
-              <Progress value={emergencyReadiness.score} className="h-2" />
+              <Progress value={emergencyReadiness.score} className={`h-2 transition-transform${isRTL ? ' [transform:scaleX(-1)]' : ''}`} />
 
               {/* RTL-safe labels: always Weak on start, Excellent on end regardless of language */}
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -517,7 +517,7 @@ export default function DashboardPage({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-[84px] sm:pb-4 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowEmergencyModal(false)}
           >
             <motion.div
@@ -548,7 +548,7 @@ export default function DashboardPage({
                   <span className={`text-sm font-medium ${readinessColor}`}>{readinessLabel}</span>
                   <span className={`text-2xl font-bold ${readinessColor}`}>{emergencyReadiness.score}%</span>
                 </div>
-                <Progress value={emergencyReadiness.score} className="h-2 mb-1" />
+                <Progress value={emergencyReadiness.score} className={`h-2 mb-1 transition-transform${isRTL ? ' [transform:scaleX(-1)]' : ''}`} />
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                   <span className="text-red-400">{t('readinessWeak')}</span>
                   <span>{emergencyReadiness.found}/{emergencyReadiness.total}</span>
