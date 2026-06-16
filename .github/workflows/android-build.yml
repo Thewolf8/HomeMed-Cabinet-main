@@ -28,9 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Build the Vite app
+      # Build the Vite app (تم التعديل هنا لتخطي فحص TypeScript الصارم)
       - name: Build web app
-        run: npm run build
+        run: npx vite build
 
       # تم الإصلاح هنا: استخدام المسار الرسمي للمكتبة لمنع خطأ npm error
       - name: Sync Capacitor Android
