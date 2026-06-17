@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
@@ -202,25 +202,25 @@ export default function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="includeNotes"
+                checked={settings.exportPreferences.includeNotes}
+                onCheckedChange={(checked) => updateExportPreference('includeNotes', !!checked)}
+              />
               <Label htmlFor="includeNotes" className="cursor-pointer">
                 {t('includeNotes')}
               </Label>
-              <Switch
-                id="includeNotes"
-                checked={settings.exportPreferences.includeNotes}
-                onCheckedChange={(checked) => updateExportPreference('includeNotes', checked)}
-              />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="includeEmergency"
+                checked={settings.exportPreferences.includeEmergencySection}
+                onCheckedChange={(checked) => updateExportPreference('includeEmergencySection', !!checked)}
+              />
               <Label htmlFor="includeEmergency" className="cursor-pointer">
                 {t('includeEmergencySection')}
               </Label>
-              <Switch
-                id="includeEmergency"
-                checked={settings.exportPreferences.includeEmergencySection}
-                onCheckedChange={(checked) => updateExportPreference('includeEmergencySection', checked)}
-              />
             </div>
           </CardContent>
         </Card>
@@ -291,7 +291,7 @@ export default function SettingsPage({
             <h3 className="font-bold text-lg">{t('appName')}</h3>
             <p className="text-sm text-muted-foreground mt-1">{t('appDescription')}</p>
             <p className="text-xs text-muted-foreground mt-3">
-              {t('version')} 1.0.0
+              {t('version')} 1.0.2
             </p>
           </CardContent>
         </Card>

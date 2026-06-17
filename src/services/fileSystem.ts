@@ -144,3 +144,39 @@ export function readFileFromInput(file: File): Promise<string> {
     reader.readAsText(file);
   });
 }
+
+/**
+ * Save file directly to device storage under Documents/homemed-backups/
+ * Returns the save path for display in a toast
+ */
+export async function downloadFile(
+  content: string,
+  filename: string,
+  isBinary: boolean = false
+): Promise<string> {
+  if (!isNative) {
+    downloadOnWeb(content, filename, 'application/octet-stream');
+    return filename;
+  }
+
+  const path = `homemed-backups/${filename}`;
+
+  try {
+    const perm = await Filesystem.checkPermissions();
+    if (perm.publicStorage !== 'granted') {
+      await Filesystem.requestPermissions();
+    }
+  } catch {
+    // Newer Android versions handle permissions differently; continue anyway
+  }
+
+  await Filesystem.writeFile({
+    path,
+    data: content,
+    directory: Directory.Documents,
+    encoding: isBinary ? undefined : Encoding.UTF8,
+    recursive: true,
+  });
+
+  return `Documents/${path}`;
+}

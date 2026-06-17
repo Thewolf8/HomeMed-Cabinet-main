@@ -32,10 +32,13 @@ interface DashboardPageProps {
     status: string;
     total: number;
     found: number;
+    inMedications: string[];
+    manuallyPresent: string[];
   };
   onNavigate: (page: Page) => void;
   onAddNew: () => void;
   onEdit: (id: string) => void;
+  onToggleEmergencyItem: (item: string) => void;
 }
 
 type StatFilter = 'all' | 'total' | 'expiringSoon' | 'expired' | 'lowStock';
@@ -91,6 +94,7 @@ export default function DashboardPage({
   onNavigate,
   onAddNew,
   onEdit,
+  onToggleEmergencyItem,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
   const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
@@ -146,8 +150,7 @@ export default function DashboardPage({
     (m) => m.quantity === 0 || getDaysUntilExpiration(m.expirationDate) < 0
   );
 
-  // Emergency medicines with details
-  const emergencyMedicinesOwned = medications.filter((m) => m.category === 'emergency');
+  // Emergency medicines with category — still used for navigation context
 
   const readinessLabel =
     emergencyReadiness.status === 'excellent'
@@ -556,62 +559,55 @@ export default function DashboardPage({
                 </div>
               </div>
 
-              {/* Emergency medicines you own */}
-              <div className="px-5 py-3 max-h-72 overflow-y-auto space-y-3">
-                {emergencyReadiness.missing.length < emergencyReadiness.total && emergencyMedicinesOwned.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {t('emergencyMedicinesOwned')} ({emergencyMedicinesOwned.length})
-                    </p>
-                    <div className="space-y-2">
-                      {emergencyMedicinesOwned.map((med) => {
-                        const days = getDaysUntilExpiration(med.expirationDate);
-                        const isExpired = days < 0;
-                        return (
-                          <div
-                            key={med.id}
-                            onClick={() => { setShowEmergencyModal(false); onEdit(med.id); }}
-                            className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 hover:border-emerald-500/40 cursor-pointer transition-all"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{med.name}</p>
-                              <p className="text-xs text-muted-foreground">{med.dosage} · x{med.quantity}</p>
-                            </div>
-                            <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                              isExpired ? 'bg-red-500/10 text-red-500' :
-                              days <= 30 ? 'bg-amber-500/10 text-amber-500' :
-                              'bg-emerald-500/10 text-emerald-500'
-                            }`}>
-                              {isExpired ? t('expiredTag') : days <= 30 ? `${days}d` : 'OK'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+              {/* Unified Emergency Items List — tap missing items to mark as present */}
+              <div className="px-5 py-3 max-h-72 overflow-y-auto space-y-2">
+                {EMERGENCY_ITEMS.map((item) => {
+                  const inMeds = emergencyReadiness.inMedications.includes(item);
+                  const manually = emergencyReadiness.manuallyPresent.includes(item);
+                  const isPresent = inMeds || manually;
 
-                {/* Missing items */}
-                {emergencyReadiness.missing.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <XCircle className="w-3.5 h-3.5" />
-                      {t('emergencyMedicinesMissing')} ({emergencyReadiness.missing.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {emergencyReadiness.missing.map((item) => (
-                        <div
-                          key={item}
-                          className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/5 border border-destructive/20"
-                        >
-                          <XCircle className="w-4 h-4 text-destructive shrink-0" />
-                          <p className="text-sm">{item}</p>
-                        </div>
-                      ))}
+                  // Find the matching medication for items in cabinet
+                  const matchedMed = inMeds
+                    ? medications.find((m) => {
+                        const low = item.toLowerCase();
+                        return m.name.toLowerCase().includes(low) || m.activeIngredient.toLowerCase().includes(low);
+                      })
+                    : null;
+
+                  return (
+                    <div
+                      key={item}
+                      onClick={() => { if (!inMeds) onToggleEmergencyItem(item); }}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-lg border transition-all ${
+                        isPresent
+                          ? 'bg-emerald-500/5 border-emerald-500/20'
+                          : 'bg-destructive/5 border-destructive/20 cursor-pointer hover:bg-destructive/10 active:scale-[0.98]'
+                      } ${!inMeds ? 'cursor-pointer' : ''}`}
+                    >
+                      {isPresent ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-destructive shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{item}</p>
+                        {matchedMed && (
+                          <p className="text-xs text-muted-foreground truncate">{matchedMed.name} · x{matchedMed.quantity}</p>
+                        )}
+                      </div>
+                      {inMeds && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 shrink-0">
+                          {t('inMedications')}
+                        </span>
+                      )}
+                      {manually && !inMeds && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 shrink-0">
+                          {t('manualMark')}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
 
               {/* Modal Footer */}

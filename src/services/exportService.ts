@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import type { Medication } from '@/types/medication';
 import { EMERGENCY_ITEMS } from '@/types/medication';
-import { saveAndShareFile, savePDFFile } from './fileSystem';
+import { saveAndShareFile, savePDFFile, downloadFile } from './fileSystem';
 import { getMedications } from './medicationService';
 
 export type ExportFormat = 'pdf' | 'txt' | 'json';
@@ -179,7 +179,7 @@ This report is not medical advice.`;
 
 // ==================== TXT Export ====================
 
-export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
+function buildTXTContent(options: ExportOptions = {}): string {
   const medications = getMedications();
   const { includeNotes = true, includeEmergencySection = true } = options;
   
@@ -189,7 +189,6 @@ export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
   content += `Export Date: ${new Date().toLocaleString()}\n`;
   content += `Total Medicines: ${medications.length}\n\n`;
   
-  // Medicines list
   content += '----------------------------------------\n';
   content += '         MEDICINE INVENTORY\n';
   content += '----------------------------------------\n\n';
@@ -215,7 +214,6 @@ export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
     content += '\n';
   }
   
-  // Emergency readiness
   if (includeEmergencySection) {
     const readiness = getEmergencyReadiness(medications);
     content += '----------------------------------------\n';
@@ -228,7 +226,6 @@ export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
     content += '\n';
   }
   
-  // AI Prompt
   content += '----------------------------------------\n';
   content += '        AI ANALYSIS PROMPT\n';
   content += '----------------------------------------\n\n';
@@ -240,20 +237,24 @@ export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
   content += '- Missing emergency essentials\n';
   content += '- Possible medicine interactions\n\n';
   content += 'This report is not medical advice.\n\n';
-  
   content += '--- End of Report ---\n';
   
+  return content;
+}
+
+export async function exportToTXT(options: ExportOptions = {}): Promise<void> {
+  const content = buildTXTContent(options);
   await saveAndShareFile(content, `homemed-inventory-${Date.now()}.txt`, 'text/plain');
 }
 
 // ==================== JSON Export ====================
 
-export async function exportToJSON(): Promise<void> {
+function buildJSONContent(): string {
   const medications = getMedications();
   
   const exportData = {
     app: 'HomeMed Cabinet',
-    version: '1.0.0',
+    version: '1.0.2',
     exportDate: new Date().toISOString(),
     medications,
     metadata: {
@@ -263,7 +264,11 @@ export async function exportToJSON(): Promise<void> {
     },
   };
   
-  const content = JSON.stringify(exportData, null, 2);
+  return JSON.stringify(exportData, null, 2);
+}
+
+export async function exportToJSON(): Promise<void> {
+  const content = buildJSONContent();
   await saveAndShareFile(content, `homemed-backup-${Date.now()}.json`, 'application/json');
 }
 
@@ -280,6 +285,74 @@ export async function exportInventory(format: ExportFormat, options: ExportOptio
     case 'json':
       await exportToJSON();
       break;
+    default:
+      throw new Error(`Unsupported export format: ${format}`);
+  }
+}
+
+// ==================== Direct Download (saves to Documents/homemed-backups/) ====================
+
+export async function downloadInventory(format: ExportFormat, options: ExportOptions = {}): Promise<string> {
+  switch (format) {
+    case 'pdf': {
+      const medications = getMedications();
+      const doc = new jsPDF();
+      const { includeEmergencySection = true } = options;
+
+      doc.setFontSize(22);
+      doc.text('HomeMed Cabinet', 14, 20);
+      doc.setFontSize(12);
+      doc.text(`Inventory Report - ${new Date().toLocaleDateString()}`, 14, 30);
+
+      const expired = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expired');
+      const expiringSoon = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expiring-soon');
+
+      doc.setFontSize(10);
+      doc.text(`Total Medicines: ${medications.length}`, 14, 42);
+      doc.text(`Expired: ${expired.length}`, 14, 48);
+      doc.text(`Expiring Soon: ${expiringSoon.length}`, 14, 54);
+      doc.text(`Low Stock: ${medications.filter((m) => m.quantity <= 5).length}`, 14, 60);
+
+      let yPos = 70;
+      if (medications.length > 0) {
+        doc.setFontSize(14);
+        doc.text('Medicine Inventory', 14, yPos);
+        yPos += 8;
+        const tableData = medications.map((med) => {
+          const days = getDaysUntilExpiration(med.expirationDate);
+          return [med.name, med.dosage, med.quantity.toString(), new Date(med.expirationDate).toLocaleDateString(), days < 0 ? 'Expired' : days <= 30 ? `Expiring (${days}d)` : 'Valid', med.category];
+        });
+        autoTable(doc, { startY: yPos, head: [['Name', 'Dosage', 'Qty', 'Expires', 'Status', 'Category']], body: tableData, theme: 'striped', styles: { fontSize: 9 }, headStyles: { fillColor: [59, 130, 246] } });
+        yPos = (doc as any).lastAutoTable.finalY + 15;
+      }
+
+      if (includeEmergencySection && yPos < 240) {
+        const readiness = getEmergencyReadiness(medications);
+        doc.setFontSize(14);
+        doc.text('Emergency Readiness', 14, yPos);
+        yPos += 8;
+        doc.setFontSize(10);
+        doc.text(`Score: ${readiness.score}% (${readiness.status})`, 14, yPos);
+        if (readiness.missing.length > 0) {
+          yPos += 6;
+          doc.text(`Missing: ${readiness.missing.join(', ')}`, 14, yPos);
+        }
+      }
+
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `homemed-inventory-${Date.now()}.pdf`;
+      return await downloadFile(pdfBase64, filename, true);
+    }
+    case 'txt': {
+      const content = buildTXTContent(options);
+      const filename = `homemed-inventory-${Date.now()}.txt`;
+      return await downloadFile(content, filename, false);
+    }
+    case 'json': {
+      const content = buildJSONContent();
+      const filename = `homemed-backup-${Date.now()}.json`;
+      return await downloadFile(content, filename, false);
+    }
     default:
       throw new Error(`Unsupported export format: ${format}`);
   }

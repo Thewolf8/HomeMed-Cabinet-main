@@ -60,6 +60,7 @@ function AppContent() {
             onNavigate={navigateTo}
             onAddNew={handleAddNew}
             onEdit={handleEdit}
+            onToggleEmergencyItem={medHook.toggleEmergencyOverride}
           />
         );
       case 'medicines':

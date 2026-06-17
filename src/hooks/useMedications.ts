@@ -14,6 +14,14 @@ import { getDaysUntilExpiration } from '@/services/exportService';
 export function useMedications() {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [manuallyPresent, setManuallyPresent] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('homemed-emergency-overrides');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     setMedications(getMedications());
@@ -64,6 +72,16 @@ export function useMedications() {
     },
     [refresh]
   );
+
+  const toggleEmergencyOverride = useCallback((item: string) => {
+    setManuallyPresent((prev) => {
+      const next = prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item];
+      try {
+        localStorage.setItem('homemed-emergency-overrides', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const filteredMedications = useCallback(
     (filters: MedicationFilters, sortField: SortField = 'name', sortOrder: SortOrder = 'asc') => {
@@ -146,13 +164,18 @@ export function useMedications() {
     
     let found = 0;
     const missing: string[] = [];
+    const inMedications: string[] = [];
     
     for (const item of EMERGENCY_ITEMS) {
       const itemLower = item.toLowerCase();
-      const hasItem = medNames.some((name) => name.includes(itemLower)) ||
+      const hasInMeds = medNames.some((name) => name.includes(itemLower)) ||
         medIngredients.some((ing) => ing.includes(itemLower));
+      const hasManually = manuallyPresent.includes(item);
       
-      if (hasItem) {
+      if (hasInMeds) {
+        inMedications.push(item);
+        found++;
+      } else if (hasManually) {
         found++;
       } else {
         missing.push(item);
@@ -164,7 +187,7 @@ export function useMedications() {
     if (score >= 80) status = 'excellent';
     else if (score >= 50) status = 'moderate';
     
-    return { score, missing, status, total: EMERGENCY_ITEMS.length, found };
+    return { score, missing, status, total: EMERGENCY_ITEMS.length, found, inMedications, manuallyPresent };
   })();
 
   return {
@@ -179,5 +202,6 @@ export function useMedications() {
     filteredMedications,
     stats,
     emergencyReadiness,
+    toggleEmergencyOverride,
   };
 }

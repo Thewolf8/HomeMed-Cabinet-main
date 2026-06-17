@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/i18n/I18nContext';
 import type { AppSettings } from '@/types/medication';
-import { exportInventory } from '@/services/exportService';
+import { exportInventory, downloadInventory } from '@/services/exportService';
 
 interface ExportPageProps {
   settings: AppSettings;
@@ -53,21 +53,37 @@ const exportFormats: {
 export default function ExportPage({ settings }: ExportPageProps) {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [exporting, setExporting] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleExport = async (format: 'pdf' | 'txt' | 'json') => {
-    setExporting(format);
+  const handleShare = async (format: 'pdf' | 'txt' | 'json') => {
+    setSharing(format);
     try {
       await exportInventory(format, {
         includeNotes: settings.exportPreferences.includeNotes,
         includeEmergencySection: settings.exportPreferences.includeEmergencySection,
       });
       toast(t('exportSuccess'));
-    } catch (error) {
+    } catch {
       toast(t('exportError'));
     } finally {
-      setExporting(null);
+      setSharing(null);
+    }
+  };
+
+  const handleDownload = async (format: 'pdf' | 'txt' | 'json') => {
+    setDownloading(format);
+    try {
+      const path = await downloadInventory(format, {
+        includeNotes: settings.exportPreferences.includeNotes,
+        includeEmergencySection: settings.exportPreferences.includeEmergencySection,
+      });
+      toast(`${t('savedToDevice')}${path ? ': ' + path : ''}`);
+    } catch {
+      toast(t('downloadFailed'));
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -87,6 +103,8 @@ This report is not medical advice.`;
     setTimeout(() => setCopied(false), 2000);
     toast(t('copied'));
   };
+
+  const isDisabled = !!sharing || !!downloading;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -112,34 +130,41 @@ This report is not medical advice.`;
                 <Card className={`${fmt.borderColor} border overflow-hidden`}>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-xl ${fmt.bgColor}`}>
+                      <div className={`p-3 rounded-xl ${fmt.bgColor} shrink-0`}>
                         <Icon className={`w-6 h-6 ${fmt.color}`} />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-semibold">{t(fmt.label)}</h3>
-                        <p className="text-sm text-muted-foreground">{fmt.desc}</p>
+                        <p className="text-sm text-muted-foreground truncate">{fmt.desc}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
+                        {/* Share button */}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleExport(fmt.key)}
-                          disabled={!!exporting}
+                          onClick={() => handleShare(fmt.key)}
+                          disabled={isDisabled}
+                          title={t('share')}
                         >
-                          {exporting === fmt.key ? (
-                            <span className="animate-spin mr-2">&#9696;</span>
+                          {sharing === fmt.key ? (
+                            <span className="animate-spin">&#9696;</span>
                           ) : (
-                            <Share2 className="w-4 h-4 mr-2" />
+                            <Share2 className="w-4 h-4" />
                           )}
-                          {t('share')}
+                          <span className="ms-1.5 hidden sm:inline">{t('share')}</span>
                         </Button>
+                        {/* Download button — icon only */}
                         <Button
                           size="sm"
-                          onClick={() => handleExport(fmt.key)}
-                          disabled={!!exporting}
+                          onClick={() => handleDownload(fmt.key)}
+                          disabled={isDisabled}
+                          title={t('download')}
                         >
-                          <Download className="w-4 h-4 mr-2" />
-                          {t('download')}
+                          {downloading === fmt.key ? (
+                            <span className="animate-spin">&#9696;</span>
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -176,12 +201,12 @@ This report is not medical advice.`;
             >
               {copied ? (
                 <>
-                  <Check className="w-4 h-4 mr-2" />
+                  <Check className="w-4 h-4 me-2" />
                   {t('copied')}
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 mr-2" />
+                  <Copy className="w-4 h-4 me-2" />
                   {t('copyPrompt')}
                 </>
               )}

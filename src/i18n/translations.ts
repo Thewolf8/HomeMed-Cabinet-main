@@ -200,6 +200,10 @@ export const translations = {
     emergencyMedicinesOwned: 'Owned',
     emergencyMedicinesMissing: 'Missing',
     closeDetails: 'Close',
+    manualMark: 'Manual',
+    inMedications: 'In cabinet',
+    savedToDevice: 'Saved to Documents/homemed-backups/',
+    downloadFailed: 'Failed to save to device',
     
     // AI Prompt Footer
     aiPromptTitle: 'AI Analysis Prompt',
@@ -407,6 +411,10 @@ export const translations = {
     emergencyMedicinesOwned: 'متوفر',
     emergencyMedicinesMissing: 'مفقود',
     closeDetails: 'إغلاق',
+    manualMark: 'يدوي',
+    inMedications: 'في الخزانة',
+    savedToDevice: 'تم الحفظ في Documents/homemed-backups/',
+    downloadFailed: 'فشل الحفظ على الجهاز',
     
     // AI Prompt Footer
     aiPromptTitle: 'موجه تحليل الذكاء الاصطناعي',
@@ -620,5 +628,9 @@ export const translations = {
     emergencyMedicinesOwned: 'Disponible',
     emergencyMedicinesMissing: 'Manquant',
     closeDetails: 'Fermer',
+    manualMark: 'Manuel',
+    inMedications: 'En armoire',
+    savedToDevice: 'Enregistré dans Documents/homemed-backups/',
+    downloadFailed: 'Échec de l\'enregistrement',
   },
 } as const;
