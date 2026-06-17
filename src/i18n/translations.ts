@@ -204,6 +204,8 @@ export const translations = {
     inMedications: 'In cabinet',
     savedToDevice: 'Saved to Documents/homemed-backups/',
     downloadFailed: 'Failed to save to device',
+    enableAnimations: 'Smooth animations',
+    enableAnimationsDesc: 'Disable for better performance on low-end devices',
     
     // AI Prompt Footer
     aiPromptTitle: 'AI Analysis Prompt',
@@ -415,6 +417,8 @@ export const translations = {
     inMedications: 'في الخزانة',
     savedToDevice: 'تم الحفظ في Documents/homemed-backups/',
     downloadFailed: 'فشل الحفظ على الجهاز',
+    enableAnimations: 'تأثيرات الحركة',
+    enableAnimationsDesc: 'أوقفها لأداء أفضل على الأجهزة الضعيفة',
     
     // AI Prompt Footer
     aiPromptTitle: 'موجه تحليل الذكاء الاصطناعي',
@@ -632,5 +636,7 @@ export const translations = {
     inMedications: 'En armoire',
     savedToDevice: 'Enregistré dans Documents/homemed-backups/',
     downloadFailed: 'Échec de l\'enregistrement',
+    enableAnimations: 'Animations fluides',
+    enableAnimationsDesc: 'Désactiver pour de meilleures performances sur les appareils lents',
   },
 } as const;
