@@ -39,6 +39,7 @@ interface SettingsPageProps {
     setLanguage: (lang: Language) => void;
     setTheme: (theme: Theme) => void;
     updateExportPreference: (key: string, value: boolean) => void;
+    setAnimationsEnabled: (v: boolean) => void;
   };
   onResetData: () => void;
   onImport: (data: unknown, merge: boolean) => { success: number; failed: number };
@@ -62,9 +63,10 @@ export default function SettingsPage({
   onResetData,
   onImport,
   toast,
+  onSettingsChange,
 }: SettingsPageProps) {
   const { t, language, setLanguage } = useI18n();
-  const { settings, setTheme, updateExportPreference } = useSettings();
+  const { settings, setTheme, updateExportPreference, setAnimationsEnabled } = useSettings();
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importData, setImportData] = useState<unknown>(null);
@@ -151,6 +153,24 @@ export default function SettingsPage({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Animation toggle */}
+            <div className="flex items-start gap-3 mt-4 pt-4 border-t border-border">
+              <Checkbox
+                id="animations"
+                checked={settings.animationsEnabled ?? true}
+                onCheckedChange={(checked) => setAnimationsEnabled(!!checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="animations" className="cursor-pointer font-medium">
+                  {t('enableAnimations')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t('enableAnimationsDesc')}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
