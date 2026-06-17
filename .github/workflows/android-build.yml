@@ -23,11 +23,11 @@ jobs:
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Java 17 (مطلوب لـ Android Gradle Plugin 8.x) ──────
-      - name: ☕ Set up JDK 17
+      # ── 2. Java 21 (تمت إعادتها إلى 21 لحل مشكلة المترجم) ──────
+      - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: temurin
           cache: gradle
 
@@ -53,8 +53,7 @@ jobs:
       - name: 🔄 Capacitor sync → Android
         run: npx cap sync android
 
-      # ── 7. توليد أيقونات التطبيق تلقائياً (الحل البديل والأضمن) ──
-      # الأداة الرسمية ستقرأ من assets/icon.png وتوزع المقاسات بدقة
+      # ── 7. توليد أيقونات التطبيق تلقائياً من Assets ──────────────
       - name: 🎨 Generate app icons from Assets
         run: |
           npm install @capacitor/assets
