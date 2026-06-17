@@ -10,6 +10,7 @@ const defaultSettings: AppSettings = {
     includeNotes: true,
     includeEmergencySection: true,
   },
+  animationsEnabled: true,
 };
 
 function loadSettings(): AppSettings {
@@ -80,11 +81,16 @@ export function useSettings() {
     }));
   }, []);
 
+  const setAnimationsEnabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, animationsEnabled: value }));
+  }, []);
+
   return {
     settings,
     setLanguage,
     setTheme,
     setExportPreferences,
     updateExportPreference,
+    setAnimationsEnabled,
   };
 }
