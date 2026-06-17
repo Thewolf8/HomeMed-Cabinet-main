@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     
-    # 🌟 الحل هنا: تمرير السر إلى متغير بيئة ليتمكن نظام GitHub من قراءته في شروط if
+    # تمرير السر إلى متغير بيئة لتفادي خطأ الجيتهاب الشهير
     env:
       KEYSTORE_BASE64_ENV: ${{ secrets.KEYSTORE_BASE64 }}
 
@@ -53,43 +53,15 @@ jobs:
       - name: 🔄 Capacitor sync → Android
         run: npx cap sync android
 
-      # ── 7. توليد أيقونات التطبيق من assets/icon.png ──────────
-      - name: 🎨 Generate app icons (ImageMagick)
+      # ── 7. توليد أيقونات التطبيق تلقائياً (الحل البديل والأضمن) ──
+      # الأداة الرسمية ستقرأ من assets/icon.png وتوزع المقاسات بدقة
+      - name: 🎨 Generate app icons from Assets
         run: |
-          ICON="assets/icon.png"
-          RES="android/app/src/main/res"
-
-          for entry in "mdpi:48:108" "hdpi:72:162" "xhdpi:96:216" "xxhdpi:144:324" "xxxhdpi:192:432"; do
-            density="${entry%%:*}"
-            rest="${entry#*:}"
-            launcher="${rest%%:*}"
-            fg="${rest#*:}"
-            dir="$RES/mipmap-$density"
-
-            # أيقونة قياسية
-            convert "$ICON" \
-              -resize "${launcher}x${launcher}" \
-              -gravity center -background none \
-              -extent "${launcher}x${launcher}" \
-              "$dir/ic_launcher.png"
-
-            # أيقونة مستديرة
-            convert "$ICON" \
-              -resize "${launcher}x${launcher}" \
-              -gravity center -background none \
-              -extent "${launcher}x${launcher}" \
-              "$dir/ic_launcher_round.png"
-
-            # طبقة أمامية للـ Adaptive Icon (API 26+)
-            convert "$ICON" \
-              -resize "${fg}x${fg}" \
-              -gravity center -background none \
-              -extent "${fg}x${fg}" \
-              "$dir/ic_launcher_foreground.png"
-          done
+          npm install @capacitor/assets
+          npx @capacitor/assets generate --android
 
       # ══════════════════════════════════════════════════════════
-      #  8a. بناء موقّع (release) — يعمل فقط عند استخدام الـ env المصلح
+      #  8a. بناء موقّع (release) — يعمل فقط عند توفر الأسرار
       # ══════════════════════════════════════════════════════════
 
       - name: 🔑 Decode signing keystore
