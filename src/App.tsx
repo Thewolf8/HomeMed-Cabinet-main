@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { I18nProvider, useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedications } from '@/hooks/useMedications';
@@ -22,7 +22,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [editId, setEditId] = useState<string | null>(null);
   const { dir } = useI18n();
-  const { settings, setLanguage, setTheme, updateExportPreference } = useSettings();
+  const { settings, setLanguage, setTheme, updateExportPreference, setAnimationsEnabled } = useSettings();
   const medHook = useMedications();
   const { toast } = useToast();
 
@@ -123,6 +123,7 @@ function AppContent() {
               setLanguage,
               setTheme,
               updateExportPreference: (key: string, value: boolean) => updateExportPreference(key as any, value),
+              setAnimationsEnabled,
             }}
             onResetData={medHook.reset}
             onImport={medHook.importData}
@@ -135,31 +136,33 @@ function AppContent() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-background text-foreground transition-colors duration-300"
-      dir={dir}
-    >
-      <Header currentPage={currentPage} />
-      
-      <main className="pb-24 md:pb-8 pt-16 md:pt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-            >
-              {renderPage()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
+    <MotionConfig reducedMotion={settings.animationsEnabled !== false ? 'never' : 'always'}>
+      <div
+        className="min-h-screen bg-background text-foreground transition-colors duration-300"
+        dir={dir}
+      >
+        <Header currentPage={currentPage} />
+        
+        <main className="pb-24 md:pb-8 pt-16 md:pt-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentPage}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                {renderPage()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
 
-      <MobileNav currentPage={currentPage} onNavigate={navigateTo} onAddNew={handleAddNew} />
-    </div>
+        <MobileNav currentPage={currentPage} onNavigate={navigateTo} onAddNew={handleAddNew} />
+      </div>
+    </MotionConfig>
   );
 }
 
