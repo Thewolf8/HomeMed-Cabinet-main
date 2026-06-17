@@ -66,4 +66,5 @@ export interface AppSettings {
   language: Language;
   theme: Theme;
   exportPreferences: ExportPreferences;
+  animationsEnabled: boolean;
 }
