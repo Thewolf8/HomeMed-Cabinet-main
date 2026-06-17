@@ -12,6 +12,10 @@ jobs:
     name: HomeMed Cabinet APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    
+    # 🌟 الحل هنا: تمرير السر إلى متغير بيئة ليتمكن نظام GitHub من قراءته في شروط if
+    env:
+      KEYSTORE_BASE64_ENV: ${{ secrets.KEYSTORE_BASE64 }}
 
     steps:
 
@@ -41,7 +45,7 @@ jobs:
       - name: 🔧 Install Capacitor CLI v8
         run: npm install --no-save @capacitor/cli@^8
 
-      # ── 5. بناء تطبيق React (تم التعديل هنا لتخطي فحص TS الصارم) ───
+      # ── 5. بناء تطبيق React (متخطي فحص TS الصارم) ─────────────
       - name: 🔨 Build web app
         run: npx vite build
 
@@ -50,13 +54,11 @@ jobs:
         run: npx cap sync android
 
       # ── 7. توليد أيقونات التطبيق من assets/icon.png ──────────
-      #      يُنشئ جميع كثافات mipmap المطلوبة
       - name: 🎨 Generate app icons (ImageMagick)
         run: |
           ICON="assets/icon.png"
           RES="android/app/src/main/res"
 
-          # density : launcher_px : foreground_px (للـ adaptive icon)
           for entry in "mdpi:48:108" "hdpi:72:162" "xhdpi:96:216" "xxhdpi:144:324" "xxxhdpi:192:432"; do
             density="${entry%%:*}"
             rest="${entry#*:}"
@@ -87,17 +89,17 @@ jobs:
           done
 
       # ══════════════════════════════════════════════════════════
-      #  8a. بناء موقّع (release) — يعمل فقط إن أضفت الأسرار
+      #  8a. بناء موقّع (release) — يعمل فقط عند استخدام الـ env المصلح
       # ══════════════════════════════════════════════════════════
 
       - name: 🔑 Decode signing keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.KEYSTORE_BASE64_ENV != ''
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
             > android/app/keystore.jks
 
       - name: 📱 Build signed release APK
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.KEYSTORE_BASE64_ENV != ''
         working-directory: android
         run: |
           chmod +x gradlew
@@ -108,11 +110,11 @@ jobs:
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
 
       # ══════════════════════════════════════════════════════════
-      #  8b. بناء debug — بدون توقيع (للاختبار)
+      #  8b. بناء debug — بدون توقيع (في حال غياب الأسرار)
       # ══════════════════════════════════════════════════════════
 
       - name: 📱 Build debug APK
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+        if: env.KEYSTORE_BASE64_ENV == ''
         working-directory: android
         run: |
           chmod +x gradlew
