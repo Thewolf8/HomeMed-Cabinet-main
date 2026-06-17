@@ -56,15 +56,15 @@ export default function MobileNav({ currentPage, onNavigate, onAddNew }: MobileN
                 <div
                   className={`transition-all duration-200 ${
                     isAdd
-                      ? 'bg-primary text-primary-foreground -mt-10 shadow-xl shadow-primary/40 rounded-2xl p-4'
+                      ? 'bg-primary text-primary-foreground rounded-xl p-2 shadow-md shadow-primary/30'
                       : isActive
                       ? 'p-1.5 rounded-xl bg-primary/10'
                       : 'p-1.5 rounded-xl'
                   }`}
                 >
-                  <Icon size={isAdd ? 30 : 20} />
+                  <Icon size={isAdd ? 24 : 20} />
                 </div>
-                <span className={`text-[10px] mt-0.5 ${isAdd ? 'sr-only' : ''}`}>
+                <span className="text-[10px] mt-0.5">
                   {item.label}
                 </span>
               </button>
