@@ -3,7 +3,7 @@ export interface Medication {
   name: string;
   activeIngredient: string;
   dosage: string;
-  form: 'tablets' | 'syrup' | 'injection' | 'cream' | 'drops' | 'other';
+  form: 'tablets' | 'capsules' | 'syrup' | 'solution' | 'suspension' | 'injection' | 'drops' | 'spray' | 'inhaler' | 'cream' | 'ointment' | 'gel' | 'patch' | 'suppository' | 'powder' | 'lozenge' | 'granules' | 'other';
   quantity: number;
   expirationDate: string;
   usageInstructions: string;
@@ -51,7 +51,12 @@ export const EMERGENCY_ITEMS = [
   'Gloves',
 ];
 
-export const MEDICINE_FORMS: MedicineForm[] = ['tablets', 'syrup', 'injection', 'cream', 'drops', 'other'];
+export const MEDICINE_FORMS: MedicineForm[] = [
+  'tablets', 'capsules', 'syrup', 'solution', 'suspension',
+  'injection', 'drops', 'spray', 'inhaler',
+  'cream', 'ointment', 'gel', 'patch',
+  'suppository', 'powder', 'lozenge', 'granules', 'other',
+];
 export const MEDICINE_CATEGORIES: MedicineCategory[] = ['adult', 'children', 'emergency', 'chronic', 'other'];
 
 export interface ExportPreferences {
@@ -67,4 +72,6 @@ export interface AppSettings {
   theme: Theme;
   exportPreferences: ExportPreferences;
   animationsEnabled: boolean;
+  dateFormat: 'DMY' | 'MDY' | 'YMD';
+  datePickerType: 'full' | 'month-year';
 }
