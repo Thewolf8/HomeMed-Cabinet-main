@@ -1,4 +1,4 @@
-name: 🏗️ Build Android APK
+Name: 🏗️ Build Android APK
 
 on:
   push:
@@ -81,15 +81,15 @@ jobs:
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
 
       # ══════════════════════════════════════════════════════════
-      #  8b. بناء debug — بدون توقيع (في حال غياب الأسرار)
+      #  8b. بناء release — بدون توقيع (في حال غياب الأسرار)
       # ══════════════════════════════════════════════════════════
 
-      - name: 📱 Build debug APK
+      - name: 📱 Build unsigned release APK
         if: env.KEYSTORE_BASE64_ENV == ''
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       # ── 9. رفع الـ APK كـ artifact ────────────────────────────
       - name: 📤 Upload APK artifact
@@ -98,6 +98,6 @@ jobs:
           name: HomeMed-Cabinet-v1.0.2
           path: |
             android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 30
+          
