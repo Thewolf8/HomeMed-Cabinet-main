@@ -54,11 +54,33 @@ export const translations = {
     
     // Medicine Forms
     tablets: 'Tablets',
+    capsules: 'Capsules',
     syrup: 'Syrup',
+    solution: 'Solution',
+    suspension: 'Suspension',
     injection: 'Injection',
-    cream: 'Cream',
     drops: 'Drops',
+    spray: 'Nasal Spray',
+    inhaler: 'Inhaler',
+    cream: 'Cream',
+    ointment: 'Ointment',
+    gel: 'Gel',
+    patch: 'Patch',
+    suppository: 'Suppository',
+    powder: 'Powder',
+    lozenge: 'Lozenge',
+    granules: 'Granules',
     other: 'Other',
+
+    // Date Settings
+    dateSettings: 'Date Settings',
+    dateFormat: 'Display Format',
+    dateFmtDMY: 'DD/MM/YYYY',
+    dateFmtMDY: 'MM/DD/YYYY',
+    dateFmtYMD: 'YYYY/MM/DD',
+    datePickerType: 'Picker Type',
+    datePickerFull: 'Day · Month · Year',
+    datePickerMonthYear: 'Month · Year only',
     
     // Categories
     adult: 'Adult',
@@ -266,12 +288,35 @@ export const translations = {
     cancel: 'إلغاء',
     
     // Medicine Forms
+    // Medicine Forms
     tablets: 'أقراص',
+    capsules: 'كبسولات',
     syrup: 'شراب',
+    solution: 'محلول',
+    suspension: 'معلق',
     injection: 'حقن',
-    cream: 'كريم',
     drops: 'قطرات',
+    spray: 'بخاخ أنفي',
+    inhaler: 'بخاخ',
+    cream: 'كريم',
+    ointment: 'مرهم',
+    gel: 'هلام',
+    patch: 'لصقة',
+    suppository: 'تحاميل',
+    powder: 'مسحوق',
+    lozenge: 'أقراص مص',
+    granules: 'حبيبات',
     other: 'أخرى',
+
+    // Date Settings
+    dateSettings: 'إعدادات التاريخ',
+    dateFormat: 'تنسيق العرض',
+    dateFmtDMY: 'يي/شش/سسسس',
+    dateFmtMDY: 'شش/يي/سسسس',
+    dateFmtYMD: 'سسسس/شش/يي',
+    datePickerType: 'نوع المنتقي',
+    datePickerFull: 'يوم · شهر · سنة',
+    datePickerMonthYear: 'شهر · سنة فقط',
     
     // Categories
     adult: 'بالغين',
@@ -479,12 +524,35 @@ export const translations = {
     cancel: 'Annuler',
     
     // Medicine Forms
+    // Medicine Forms
     tablets: 'Comprimés',
+    capsules: 'Gélules',
     syrup: 'Sirop',
+    solution: 'Solution',
+    suspension: 'Suspension',
     injection: 'Injection',
-    cream: 'Crème',
     drops: 'Gouttes',
+    spray: 'Spray nasal',
+    inhaler: 'Inhalateur',
+    cream: 'Crème',
+    ointment: 'Pommade',
+    gel: 'Gel',
+    patch: 'Patch',
+    suppository: 'Suppositoire',
+    powder: 'Poudre',
+    lozenge: 'Pastille',
+    granules: 'Granules',
     other: 'Autre',
+
+    // Date Settings
+    dateSettings: 'Paramètres de date',
+    dateFormat: 'Format d\'affichage',
+    dateFmtDMY: 'JJ/MM/AAAA',
+    dateFmtMDY: 'MM/JJ/AAAA',
+    dateFmtYMD: 'AAAA/MM/JJ',
+    datePickerType: 'Type de sélecteur',
+    datePickerFull: 'Jour · Mois · Année',
+    datePickerMonthYear: 'Mois · Année uniquement',
     
     // Categories
     adult: 'Adulte',
