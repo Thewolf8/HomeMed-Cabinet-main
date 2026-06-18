@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useSettings } from '@/hooks/useSettings';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,8 @@ interface EditMedicinePageProps {
 
 export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedicinePageProps) {
   const { t } = useI18n();
+  const { settings } = useSettings();
+  const isMonthYear = settings.datePickerType === 'month-year';
   const [form, setForm] = useState<Medication | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -174,10 +177,15 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 <Label htmlFor="quantity">{t('quantity')}</Label>
                 <Input
                   id="quantity"
-                  type="number"
-                  min={0}
-                  value={form.quantity}
-                  onChange={(e) => update('quantity', parseInt(e.target.value) || 0)}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={form.quantity === 0 ? '' : form.quantity}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    update('quantity', raw === '' ? 0 : parseInt(raw, 10));
+                  }}
                 />
               </div>
 
@@ -188,9 +196,14 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 </Label>
                 <Input
                   id="expirationDate"
-                  type="date"
-                  value={form.expirationDate}
-                  onChange={(e) => update('expirationDate', e.target.value)}
+                  type={isMonthYear ? 'month' : 'date'}
+                  value={isMonthYear && form.expirationDate
+                    ? form.expirationDate.substring(0, 7)
+                    : form.expirationDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    update('expirationDate', isMonthYear && val ? val + '-01' : val);
+                  }}
                   className={errors.expirationDate ? 'border-destructive' : ''}
                 />
                 {errors.expirationDate && (
@@ -244,15 +257,15 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
             </div>
 
             {/* Prescription Required */}
-            <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-3 py-2">
+              <Checkbox
+                id="prescription"
+                checked={form.prescriptionRequired}
+                onCheckedChange={(checked) => update('prescriptionRequired', !!checked)}
+              />
               <Label htmlFor="prescription" className="cursor-pointer">
                 {t('prescriptionRequired')}
               </Label>
-              <Switch
-                id="prescription"
-                checked={form.prescriptionRequired}
-                onCheckedChange={(checked) => update('prescriptionRequired', checked)}
-              />
             </div>
 
             {/* Image Upload */}

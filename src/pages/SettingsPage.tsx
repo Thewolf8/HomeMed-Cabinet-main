@@ -13,6 +13,7 @@ import {
   Upload,
   Check,
   Monitor,
+  Clock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,7 +67,7 @@ export default function SettingsPage({
   onSettingsChange,
 }: SettingsPageProps) {
   const { t, language, setLanguage } = useI18n();
-  const { settings, setTheme, updateExportPreference, setAnimationsEnabled } = useSettings();
+  const { settings, setTheme, updateExportPreference, setAnimationsEnabled, setDateFormat, setDatePickerType } = useSettings();
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importData, setImportData] = useState<unknown>(null);
@@ -209,6 +210,65 @@ export default function SettingsPage({
                   )}
                 </button>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Date Settings ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              {t('dateSettings')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Display Format */}
+            <div>
+              <p className="text-sm font-medium mb-2">{t('dateFormat')}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['DMY', 'MDY', 'YMD'] as const).map((fmt) => {
+                  const isActive = (settings.dateFormat ?? 'DMY') === fmt;
+                  return (
+                    <button
+                      key={fmt}
+                      onClick={() => setDateFormat(fmt)}
+                      className={`p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                        isActive
+                          ? 'bg-primary/10 border-primary/40 text-primary'
+                          : 'border-transparent hover:bg-accent text-muted-foreground'
+                      }`}
+                    >
+                      {t(`dateFmt${fmt}` as any)}
+                      {isActive && <Check className="w-3 h-3 mx-auto mt-1" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Picker Type */}
+            <div>
+              <p className="text-sm font-medium mb-2">{t('datePickerType')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['full', 'month-year'] as const).map((type) => {
+                  const isActive = (settings.datePickerType ?? 'full') === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setDatePickerType(type)}
+                      className={`p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                        isActive
+                          ? 'bg-primary/10 border-primary/40 text-primary'
+                          : 'border-transparent hover:bg-accent text-muted-foreground'
+                      }`}
+                    >
+                      {type === 'full' ? t('datePickerFull') : t('datePickerMonthYear')}
+                      {isActive && <Check className="w-3 h-3 mx-auto mt-1" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>

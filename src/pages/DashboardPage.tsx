@@ -566,13 +566,14 @@ export default function DashboardPage({
                   const manually = emergencyReadiness.manuallyPresent.includes(item);
                   const isPresent = inMeds || manually;
 
-                  // Find the matching medication for items in cabinet
-                  const matchedMed = inMeds
-                    ? medications.find((m) => {
+                  // Find ALL matching medications and sum their quantities
+                  const matchedMeds = inMeds
+                    ? medications.filter((m) => {
                         const low = item.toLowerCase();
                         return m.name.toLowerCase().includes(low) || m.activeIngredient.toLowerCase().includes(low);
                       })
-                    : null;
+                    : [];
+                  const totalQty = matchedMeds.reduce((sum, m) => sum + m.quantity, 0);
 
                   return (
                     <div
@@ -591,8 +592,8 @@ export default function DashboardPage({
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{item}</p>
-                        {matchedMed && (
-                          <p className="text-xs text-muted-foreground truncate">{matchedMed.name} · x{matchedMed.quantity}</p>
+                        {inMeds && totalQty > 0 && (
+                          <p className="text-xs text-muted-foreground">x{totalQty}</p>
                         )}
                       </div>
                       {inMeds && (
