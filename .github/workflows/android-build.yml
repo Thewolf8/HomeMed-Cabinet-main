@@ -1,4 +1,4 @@
-Name: 🏗️ Build Android APK
+name: 🏗️ Build Android APK
 
 on:
   push:
@@ -12,10 +12,6 @@ jobs:
     name: HomeMed Cabinet APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    
-    # تمرير السر إلى متغير بيئة لتفادي خطأ الجيتهاب الشهير
-    env:
-      KEYSTORE_BASE64_ENV: ${{ secrets.KEYSTORE_BASE64 }}
 
     steps:
 
@@ -60,32 +56,9 @@ jobs:
           npx @capacitor/assets generate --android
 
       # ══════════════════════════════════════════════════════════
-      #  8a. بناء موقّع (release) — يعمل فقط عند توفر الأسرار
+      #  8. بناء نسخة Release غير موقعة (Unsigned)
       # ══════════════════════════════════════════════════════════
-
-      - name: 🔑 Decode signing keystore
-        if: env.KEYSTORE_BASE64_ENV != ''
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
-            > android/app/keystore.jks
-
-      - name: 📱 Build signed release APK
-        if: env.KEYSTORE_BASE64_ENV != ''
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="${{ github.workspace }}/android/app/keystore.jks" \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
-
-      # ══════════════════════════════════════════════════════════
-      #  8b. بناء release — بدون توقيع (في حال غياب الأسرار)
-      # ══════════════════════════════════════════════════════════
-
       - name: 📱 Build unsigned release APK
-        if: env.KEYSTORE_BASE64_ENV == ''
         working-directory: android
         run: |
           chmod +x gradlew
@@ -96,8 +69,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HomeMed-Cabinet-v1.0.2
-          path: |
-            android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
           retention-days: 30
-          
