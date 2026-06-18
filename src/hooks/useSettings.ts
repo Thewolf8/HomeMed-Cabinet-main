@@ -6,54 +6,57 @@ const SETTINGS_KEY = 'homemed-settings';
 const defaultSettings: AppSettings = {
   language: 'system',
   theme: 'system',
-  exportPreferences: {
-    includeNotes: true,
-    includeEmergencySection: true,
-  },
+  exportPreferences: { includeNotes: true, includeEmergencySection: true },
   animationsEnabled: true,
+  dateFormat: 'DMY',
+  datePickerType: 'full',
 };
 
 function loadSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Migrate old 'dark' default to 'system' if user never explicitly chose
-      return { ...defaultSettings, ...parsed };
-    }
-  } catch {
-    // localStorage not available
-  }
+    if (stored) return { ...defaultSettings, ...JSON.parse(stored) };
+  } catch {}
   return { ...defaultSettings };
-}
-
-function saveSettingsToStorage(settings: AppSettings): void {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage not available
-  }
 }
 
 function applyTheme(theme: Theme) {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const shouldBeDark = theme === 'dark' || (theme === 'system' && prefersDark);
-  if (shouldBeDark) {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
+  const dark = theme === 'dark' || (theme === 'system' && prefersDark);
+  document.documentElement.classList.toggle('dark', dark);
 }
 
+function applyAnimations(enabled: boolean) {
+  document.documentElement.classList.toggle('no-animations', !enabled);
+}
+
+// ── Module-level shared store (pub-sub) ───────────────────────────────────
+// All useSettings() instances share the same state and update each other
+// instantly — no restart needed.
+let _s: AppSettings = loadSettings();
+const _subs = new Set<(s: AppSettings) => void>();
+
+function dispatch(next: AppSettings) {
+  _s = next;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch {}
+  applyTheme(next.theme);
+  applyAnimations(next.animationsEnabled);
+  _subs.forEach(fn => fn({ ...next }));
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 export function useSettings() {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [settings, setLocal] = useState<AppSettings>(() => ({ ..._s }));
 
   useEffect(() => {
-    saveSettingsToStorage(settings);
-    applyTheme(settings.theme);
-  }, [settings]);
+    _subs.add(setLocal);
+    // Apply side-effects on mount
+    applyTheme(_s.theme);
+    applyAnimations(_s.animationsEnabled);
+    return () => { _subs.delete(setLocal); };
+  }, []);
 
-  // Listen to system theme changes in real-time when theme is 'system'
+  // System theme listener
   useEffect(() => {
     if (settings.theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -62,28 +65,27 @@ export function useSettings() {
     return () => mq.removeEventListener('change', handler);
   }, [settings.theme]);
 
-  const setLanguage = useCallback((language: Language) => {
-    setSettings((prev) => ({ ...prev, language }));
-  }, []);
+  const setLanguage = useCallback(
+    (language: Language) => dispatch({ ..._s, language }), []);
 
-  const setTheme = useCallback((theme: Theme) => {
-    setSettings((prev) => ({ ...prev, theme }));
-  }, []);
+  const setTheme = useCallback(
+    (theme: Theme) => dispatch({ ..._s, theme }), []);
 
-  const setExportPreferences = useCallback((prefs: ExportPreferences) => {
-    setSettings((prev) => ({ ...prev, exportPreferences: prefs }));
-  }, []);
+  const setExportPreferences = useCallback(
+    (exportPreferences: ExportPreferences) => dispatch({ ..._s, exportPreferences }), []);
 
-  const updateExportPreference = useCallback((key: keyof ExportPreferences, value: boolean) => {
-    setSettings((prev) => ({
-      ...prev,
-      exportPreferences: { ...prev.exportPreferences, [key]: value },
-    }));
-  }, []);
+  const updateExportPreference = useCallback(
+    (key: keyof ExportPreferences, value: boolean) =>
+      dispatch({ ..._s, exportPreferences: { ..._s.exportPreferences, [key]: value } }), []);
 
-  const setAnimationsEnabled = useCallback((value: boolean) => {
-    setSettings((prev) => ({ ...prev, animationsEnabled: value }));
-  }, []);
+  const setAnimationsEnabled = useCallback(
+    (animationsEnabled: boolean) => dispatch({ ..._s, animationsEnabled }), []);
+
+  const setDateFormat = useCallback(
+    (dateFormat: 'DMY' | 'MDY' | 'YMD') => dispatch({ ..._s, dateFormat }), []);
+
+  const setDatePickerType = useCallback(
+    (datePickerType: 'full' | 'month-year') => dispatch({ ..._s, datePickerType }), []);
 
   return {
     settings,
@@ -92,5 +94,7 @@ export function useSettings() {
     setExportPreferences,
     updateExportPreference,
     setAnimationsEnabled,
+    setDateFormat,
+    setDatePickerType,
   };
 }
