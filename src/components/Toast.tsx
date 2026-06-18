@@ -16,10 +16,10 @@ const iconMap = {
 };
 
 const colorMap = {
-  success: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300',
-  error: 'bg-red-500/20 border-red-500/30 text-red-300',
-  warning: 'bg-amber-500/20 border-amber-500/30 text-amber-300',
-  info: 'bg-[#5F9E95]/20 border-[#5F9E95]/30 text-[#5F9E95]',
+  success: 'bg-gray-900 border-emerald-500/50 text-emerald-300',
+  error:   'bg-gray-900 border-red-500/50 text-red-300',
+  warning: 'bg-gray-900 border-amber-500/50 text-amber-300',
+  info:    'bg-gray-900 border-[#5F9E95]/50 text-[#7FBDB4]',
 };
 
 export function ToastContainer({ toasts, onRemove }: ToastProps) {
