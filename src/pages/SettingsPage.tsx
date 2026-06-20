@@ -14,14 +14,20 @@ import {
   Check,
   Monitor,
   Clock,
+  Bell,
+  BellOff,
+  CalendarX2,
+  Layers,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
-import type { AppSettings, Language, Theme } from '@/types/medication';
+import type { AppSettings, Language, Theme, NotificationPreferences } from '@/types/medication';
 import { readFileFromInput } from '@/services/fileSystem';
 import {
   AlertDialog,
@@ -44,6 +50,7 @@ interface SettingsPageProps {
   };
   onResetData: () => void;
   onImport: (data: unknown, merge: boolean) => { success: number; failed: number };
+  onRescheduleNotifications: (prefs: NotificationPreferences) => void;
   toast: any;
 }
 
@@ -63,15 +70,40 @@ const themeOptions: { value: Theme; labelKey: 'themeLight' | 'themeDark' | 'them
 export default function SettingsPage({
   onResetData,
   onImport,
+  onRescheduleNotifications,
   toast,
   onSettingsChange,
 }: SettingsPageProps) {
   const { t, language, setLanguage } = useI18n();
-  const { settings, setTheme, updateExportPreference, setAnimationsEnabled, setDateFormat, setDatePickerType } = useSettings();
+  const {
+    settings,
+    setTheme,
+    updateExportPreference,
+    setAnimationsEnabled,
+    setDateFormat,
+    setDatePickerType,
+    setNotificationPreference,
+    setAutoDeleteExpired,
+    setSmartMergeEnabled,
+  } = useSettings();
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importData, setImportData] = useState<unknown>(null);
+  const [daysInput, setDaysInput] = useState(String(settings.notifications.daysBeforeExpiry ?? 30));
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleNotificationToggle = (key: keyof NotificationPreferences, value: boolean) => {
+    setNotificationPreference(key, value);
+    onRescheduleNotifications({ ...settings.notifications, [key]: value });
+  };
+
+  const commitDaysBeforeExpiry = () => {
+    const parsed = parseInt(daysInput, 10);
+    const days = Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+    setDaysInput(String(days));
+    setNotificationPreference('daysBeforeExpiry', days);
+    onRescheduleNotifications({ ...settings.notifications, daysBeforeExpiry: days });
+  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -269,6 +301,123 @@ export default function SettingsPage({
                   );
                 })}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Notifications ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              {t('notificationsTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="notif-expiring" className="cursor-pointer font-medium">
+                  {t('notifExpiringSoon')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('notifExpiringSoonDesc')}</p>
+              </div>
+              <Switch
+                id="notif-expiring"
+                checked={settings.notifications.expiringSoonEnabled}
+                onCheckedChange={(checked) => handleNotificationToggle('expiringSoonEnabled', checked)}
+              />
+            </div>
+
+            {settings.notifications.expiringSoonEnabled && (
+              <div className="ps-0 sm:ps-1">
+                <Label htmlFor="days-before" className="text-xs text-muted-foreground mb-1.5 block">
+                  {t('notifDaysBefore')}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="days-before"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={daysInput}
+                    onChange={(e) => setDaysInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    onBlur={commitDaysBeforeExpiry}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">{t('days')}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+              <div>
+                <Label htmlFor="notif-expired" className="cursor-pointer font-medium">
+                  {t('notifExpired')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('notifExpiredDesc')}</p>
+              </div>
+              <Switch
+                id="notif-expired"
+                checked={settings.notifications.expiredEnabled}
+                onCheckedChange={(checked) => handleNotificationToggle('expiredEnabled', checked)}
+              />
+            </div>
+
+            {!settings.notifications.expiringSoonEnabled && !settings.notifications.expiredEnabled && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                <BellOff className="w-3.5 h-3.5 shrink-0" />
+                <span>{t('notifAllDisabled')}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Smart Merge ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              {t('smartMergeTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="smart-merge" className="cursor-pointer font-medium">
+                  {t('smartMergeToggle')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('smartMergeDesc')}</p>
+              </div>
+              <Switch
+                id="smart-merge"
+                checked={settings.smartMergeEnabled}
+                onCheckedChange={(checked) => setSmartMergeEnabled(checked)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Cleanup ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarX2 className="w-4 h-4" />
+              {t('cleanupTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="auto-delete" className="cursor-pointer font-medium">
+                  {t('autoDeleteToggle')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('autoDeleteDesc')}</p>
+              </div>
+              <Switch
+                id="auto-delete"
+                checked={settings.autoDeleteExpired}
+                onCheckedChange={(checked) => setAutoDeleteExpired(checked)}
+              />
             </div>
           </CardContent>
         </Card>

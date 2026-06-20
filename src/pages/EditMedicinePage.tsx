@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, ImagePlus, X } from 'lucide-react';
+import { Pencil, ImagePlus, X, ScanLine, Info, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +15,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useI18n } from '@/i18n/I18nContext';
+import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
 import { MEDICINE_FORMS, MEDICINE_CATEGORIES } from '@/types/medication';
 import { getMedicationById } from '@/services/medicationService';
+import {
+  scanBarcodeOnce,
+  cancelBarcodeScan,
+  findMedicationByBarcode,
+  BarcodeNotSupportedError,
+  BarcodePermissionDeniedError,
+} from '@/services/barcodeService';
 
 interface EditMedicinePageProps {
   medId: string;
@@ -29,9 +44,12 @@ interface EditMedicinePageProps {
 export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedicinePageProps) {
   const { t } = useI18n();
   const { settings } = useSettings();
+  const { toast } = useToast();
   const isMonthYear = settings.datePickerType === 'month-year';
   const [form, setForm] = useState<Medication | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [scanning, setScanning] = useState(false);
+  const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
 
   useEffect(() => {
     const med = getMedicationById(medId);
@@ -39,6 +57,36 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       setForm(med);
     }
   }, [medId]);
+
+  const handleScanBarcode = async () => {
+    setScanning(true);
+    try {
+      const code = await scanBarcodeOnce();
+      if (!code) {
+        setScanning(false);
+        return; // user cancelled
+      }
+
+      update('barcode', code);
+
+      const known = findMedicationByBarcode(code);
+      if (known && known.id !== medId) {
+        toast(t('barcodeAutoFilledToast'));
+      } else {
+        toast(t('barcodeScannedToast'));
+      }
+    } catch (err) {
+      if (err instanceof BarcodePermissionDeniedError) {
+        toast(t('barcodePermissionDenied'));
+      } else if (err instanceof BarcodeNotSupportedError) {
+        toast(t('barcodeNotSupported'));
+      } else {
+        toast(t('barcodeScanError'));
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -65,6 +113,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       prescriptionRequired: form.prescriptionRequired,
       notes: form.notes,
       image: form.image,
+      barcode: form.barcode,
     });
   };
 
@@ -113,9 +162,35 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="name">
-                {t('medicineName')} <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="name">
+                  {t('medicineName')} <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowBarcodeInfo(true)}
+                    className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    aria-label={t('barcodeInfoTitle')}
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleScanBarcode}
+                    disabled={scanning}
+                  >
+                    {scanning ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ScanLine className="w-4 h-4" />
+                    )}
+                    <span className="ms-1.5">{t('scanBarcode')}</span>
+                  </Button>
+                </div>
+              </div>
               <Input
                 id="name"
                 value={form.name}
@@ -124,6 +199,17 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+            </div>
+
+            {/* Barcode */}
+            <div className="space-y-1.5">
+              <Label htmlFor="barcode">{t('barcodeField')}</Label>
+              <Input
+                id="barcode"
+                value={form.barcode ?? ''}
+                onChange={(e) => update('barcode', e.target.value)}
+                placeholder={t('barcodeFieldPlaceholder')}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -310,6 +396,41 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
           </form>
         </CardContent>
       </Card>
+
+      {/* Barcode privacy/info dialog */}
+      <Dialog open={showBarcodeInfo} onOpenChange={setShowBarcodeInfo}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanLine className="w-5 h-5 text-primary" />
+              {t('barcodeInfoTitle')}
+            </DialogTitle>
+            <DialogDescription className="text-start pt-2">
+              {t('barcodeInfoDesc')}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      {/* Camera scan overlay — shown while the native camera preview is
+          visible behind the (now transparent) WebView. See App.css. */}
+      {scanning && (
+        <div className="barcode-scan-overlay fixed inset-0 z-[9999] flex flex-col items-center justify-between py-12 px-6 pointer-events-none">
+          <div className="bg-black/60 text-white text-sm rounded-full px-4 py-2 pointer-events-none">
+            {t('barcodeScanHint')}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            className="pointer-events-auto shadow-lg"
+            onClick={() => cancelBarcodeScan()}
+          >
+            <X className="w-4 h-4 me-1.5" />
+            {t('cancel')}
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }

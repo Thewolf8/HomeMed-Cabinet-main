@@ -4,6 +4,8 @@ import { I18nProvider, useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedications } from '@/hooks/useMedications';
 import { useToast } from '@/hooks/use-toast';
+import { registerHomeMedFileListener } from '@/services/deepLinkService';
+import type { HomeMedPayload } from '@/services/homemedFormat';
 
 import MobileNav from '@/components/MobileNav';
 import Header from '@/components/Header';
@@ -13,6 +15,7 @@ import AddMedicinePage from '@/pages/AddMedicinePage';
 import EditMedicinePage from '@/pages/EditMedicinePage';
 import ExportPage from '@/pages/ExportPage';
 import SettingsPage from '@/pages/SettingsPage';
+import ImportConflictModal from '@/components/ImportConflictModal';
 
 import './App.css';
 
@@ -21,10 +24,38 @@ export type Page = 'dashboard' | 'medicines' | 'add' | 'export' | 'settings' | '
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [editId, setEditId] = useState<string | null>(null);
-  const { dir } = useI18n();
+  const [pendingHomeMedImport, setPendingHomeMedImport] = useState<HomeMedPayload | null>(null);
+  const { t, dir } = useI18n();
   const { settings, setLanguage, setTheme, updateExportPreference, setAnimationsEnabled } = useSettings();
   const medHook = useMedications();
   const { toast } = useToast();
+
+  // Listen for .homemed files opened from outside the app (file manager, WhatsApp, etc.)
+  useEffect(() => {
+    const unsubscribe = registerHomeMedFileListener(
+      (payload) => setPendingHomeMedImport(payload),
+      () => toast(t('homemedImportError'))
+    );
+    return unsubscribe;
+  }, []);
+
+  const handleHomeMedMerge = () => {
+    if (!pendingHomeMedImport) return;
+    medHook.importData(pendingHomeMedImport.medications, true);
+    toast(t('homemedImportSuccess'));
+    setPendingHomeMedImport(null);
+  };
+
+  const handleHomeMedReplace = () => {
+    if (!pendingHomeMedImport) return;
+    medHook.importData(pendingHomeMedImport.medications, false);
+    toast(t('homemedImportSuccess'));
+    setPendingHomeMedImport(null);
+  };
+
+  const handleHomeMedCancel = () => {
+    setPendingHomeMedImport(null);
+  };
 
   const navigateTo = (page: Page) => {
     setCurrentPage(page);
@@ -61,6 +92,11 @@ function AppContent() {
             onAddNew={handleAddNew}
             onEdit={handleEdit}
             onToggleEmergencyItem={medHook.toggleEmergencyOverride}
+            showDeleteExpired={!settings.autoDeleteExpired && medHook.stats.expired > 0}
+            onDeleteExpired={() => {
+              const count = medHook.deleteExpired();
+              if (count > 0) toast(t('deleteExpiredSuccess'));
+            }}
           />
         );
       case 'medicines':
@@ -79,8 +115,8 @@ function AppContent() {
           <AddMedicinePage
             key="add"
             onSave={(med) => {
-              medHook.add(med);
-              toast('Medicine added successfully');
+              const { merged } = medHook.add(med);
+              toast(merged ? t('mergedToast') : 'Medicine added successfully');
               navigateTo('medicines');
             }}
             onCancel={() => navigateTo('medicines')}
@@ -97,7 +133,7 @@ function AppContent() {
             medId={editId}
             onSave={(id, updates) => {
               medHook.update(id, updates);
-              toast('Medicine updated successfully');
+              toast(t('updateMedicine'));
               navigateTo('medicines');
               setEditId(null);
             }}
@@ -127,6 +163,7 @@ function AppContent() {
             }}
             onResetData={medHook.reset}
             onImport={medHook.importData}
+            onRescheduleNotifications={medHook.rescheduleAllNotifications}
             toast={toast}
           />
         );
@@ -161,6 +198,14 @@ function AppContent() {
         </main>
 
         <MobileNav currentPage={currentPage} onNavigate={navigateTo} onAddNew={handleAddNew} />
+
+        <ImportConflictModal
+          open={!!pendingHomeMedImport}
+          medications={pendingHomeMedImport?.medications ?? null}
+          onMerge={handleHomeMedMerge}
+          onReplace={handleHomeMedReplace}
+          onCancel={handleHomeMedCancel}
+        />
       </div>
     </MotionConfig>
   );

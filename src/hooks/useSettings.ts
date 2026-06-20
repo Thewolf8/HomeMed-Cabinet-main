@@ -10,12 +10,27 @@ const defaultSettings: AppSettings = {
   animationsEnabled: true,
   dateFormat: 'DMY',
   datePickerType: 'full',
+  notifications: {
+    expiringSoonEnabled: true,
+    expiredEnabled: true,
+    daysBeforeExpiry: 30,
+  },
+  autoDeleteExpired: false,
+  smartMergeEnabled: true,
 };
 
 function loadSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
-    if (stored) return { ...defaultSettings, ...JSON.parse(stored) };
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        ...defaultSettings,
+        ...parsed,
+        exportPreferences: { ...defaultSettings.exportPreferences, ...(parsed.exportPreferences ?? {}) },
+        notifications: { ...defaultSettings.notifications, ...(parsed.notifications ?? {}) },
+      };
+    }
   } catch {}
   return { ...defaultSettings };
 }
@@ -44,6 +59,11 @@ function dispatch(next: AppSettings) {
   _subs.forEach(fn => fn({ ...next }));
 }
 // ─────────────────────────────────────────────────────────────────────────
+
+/** Synchronous snapshot of the current settings — safe to call outside React components. */
+export function getSettings(): AppSettings {
+  return { ..._s };
+}
 
 export function useSettings() {
   const [settings, setLocal] = useState<AppSettings>(() => ({ ..._s }));
@@ -87,6 +107,16 @@ export function useSettings() {
   const setDatePickerType = useCallback(
     (datePickerType: 'full' | 'month-year') => dispatch({ ..._s, datePickerType }), []);
 
+  const setNotificationPreference = useCallback(
+    (key: keyof AppSettings['notifications'], value: boolean | number) =>
+      dispatch({ ..._s, notifications: { ..._s.notifications, [key]: value } }), []);
+
+  const setAutoDeleteExpired = useCallback(
+    (autoDeleteExpired: boolean) => dispatch({ ..._s, autoDeleteExpired }), []);
+
+  const setSmartMergeEnabled = useCallback(
+    (smartMergeEnabled: boolean) => dispatch({ ..._s, smartMergeEnabled }), []);
+
   return {
     settings,
     setLanguage,
@@ -96,5 +126,8 @@ export function useSettings() {
     setAnimationsEnabled,
     setDateFormat,
     setDatePickerType,
+    setNotificationPreference,
+    setAutoDeleteExpired,
+    setSmartMergeEnabled,
   };
 }

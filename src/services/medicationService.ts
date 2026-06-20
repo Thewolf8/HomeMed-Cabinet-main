@@ -39,6 +39,59 @@ export function addMedication(med: Omit<Medication, 'id' | 'createdAt' | 'update
   return newMed;
 }
 
+/**
+ * Finds an existing medication that is functionally identical to the given
+ * one — same name + active ingredient + dosage + expiration date — which is
+ * the matching rule used by the "Smart Merge" feature.
+ */
+export function findMatchingMedication(
+  med: Pick<Medication, 'name' | 'activeIngredient' | 'dosage' | 'expirationDate'>,
+  pool: Medication[] = getMedications()
+): Medication | undefined {
+  const norm = (s: string) => s.trim().toLowerCase();
+  return pool.find(
+    (m) =>
+      norm(m.name) === norm(med.name) &&
+      norm(m.activeIngredient) === norm(med.activeIngredient) &&
+      norm(m.dosage) === norm(med.dosage) &&
+      m.expirationDate === med.expirationDate
+  );
+}
+
+/**
+ * Adds a new medication, or — when smartMerge is enabled and a matching
+ * medication already exists (same name + active ingredient + dosage +
+ * expiration date) — merges the quantities into the existing entry instead
+ * of creating a duplicate row.
+ */
+export function addOrMergeMedication(
+  med: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>,
+  smartMerge: boolean
+): { medication: Medication; merged: boolean } {
+  if (smartMerge) {
+    const medications = getMedications();
+    const match = findMatchingMedication(med, medications);
+    if (match) {
+      const index = medications.findIndex((m) => m.id === match.id);
+      const merged: Medication = {
+        ...match,
+        quantity: match.quantity + med.quantity,
+        // Keep the freshest free-text fields, in case the user added more detail this time.
+        usageInstructions: med.usageInstructions || match.usageInstructions,
+        notes: med.notes || match.notes,
+        image: med.image || match.image,
+        barcode: med.barcode || match.barcode,
+        updatedAt: new Date().toISOString(),
+      };
+      medications[index] = merged;
+      saveMedications(medications);
+      return { medication: merged, merged: true };
+    }
+  }
+
+  return { medication: addMedication(med), merged: false };
+}
+
 export function updateMedication(id: string, updates: Partial<Medication>): Medication | null {
   const medications = getMedications();
   const index = medications.findIndex((m) => m.id === id);
@@ -63,6 +116,31 @@ export function deleteMedication(id: string): boolean {
 
 export function getMedicationById(id: string): Medication | undefined {
   return getMedications().find((m) => m.id === id);
+}
+
+function isExpired(expirationDate: string): boolean {
+  const exp = new Date(expirationDate);
+  if (isNaN(exp.getTime())) return false;
+  const now = new Date();
+  // Mirrors exportService's getDaysUntilExpiration()/getExpirationStatus()
+  // definition of "expired" exactly, so the dashboard's expired count always
+  // matches what this function actually removes.
+  const days = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return days < 0;
+}
+
+/**
+ * Removes every medication whose expirationDate has already passed.
+ * Returns the removed medications so callers (e.g. to cancel their
+ * scheduled notifications) know what was deleted.
+ */
+export function deleteExpiredMedications(): Medication[] {
+  const medications = getMedications();
+  const expired = medications.filter((m) => isExpired(m.expirationDate));
+  if (expired.length === 0) return [];
+  const remaining = medications.filter((m) => !isExpired(m.expirationDate));
+  saveMedications(remaining);
+  return expired;
 }
 
 export function resetAllData(): void {

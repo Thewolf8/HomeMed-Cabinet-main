@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, FileSpreadsheet, FileJson, Share2, Download, Copy, Check } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileJson, Share2, Download, Copy, Check, PackageCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -13,8 +13,8 @@ interface ExportPageProps {
 }
 
 const exportFormats: {
-  key: 'pdf' | 'txt' | 'json';
-  label: 'exportPDF' | 'exportTXT' | 'exportJSON';
+  key: 'pdf' | 'txt' | 'json' | 'homemed';
+  label: 'exportPDF' | 'exportTXT' | 'exportJSON' | 'exportHomeMed';
   desc: string;
   icon: typeof FileText;
   color: string;
@@ -48,6 +48,15 @@ const exportFormats: {
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/20',
   },
+  {
+    key: 'homemed',
+    label: 'exportHomeMed',
+    desc: 'A compressed .homemed file — tap to reopen directly in HomeMed Cabinet',
+    icon: PackageCheck,
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/30',
+  },
 ];
 
 export default function ExportPage({ settings }: ExportPageProps) {
@@ -57,7 +66,7 @@ export default function ExportPage({ settings }: ExportPageProps) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleShare = async (format: 'pdf' | 'txt' | 'json') => {
+  const handleShare = async (format: 'pdf' | 'txt' | 'json' | 'homemed') => {
     setSharing(format);
     try {
       await exportInventory(format, {
@@ -72,7 +81,7 @@ export default function ExportPage({ settings }: ExportPageProps) {
     }
   };
 
-  const handleDownload = async (format: 'pdf' | 'txt' | 'json') => {
+  const handleDownload = async (format: 'pdf' | 'txt' | 'json' | 'homemed') => {
     setDownloading(format);
     try {
       const path = await downloadInventory(format, {

@@ -161,3 +161,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .rtl .text-right {
   text-align: left;
 }
+
+/* ── Barcode scanner (Requirement IV) ──────────────────────────────────
+   @capacitor-mlkit/barcode-scanning's startScan() renders the device camera
+   natively *behind* the WebView. While a scan is active, the WebView's own
+   background must turn fully transparent so the camera feed is visible;
+   everything else in the DOM is also hidden except the small overlay the
+   scanning pages render on top (the "Cancel" button + hint text). */
+body.barcode-scanner-active,
+body.barcode-scanner-active #root {
+  background: transparent !important;
+}
+body.barcode-scanner-active * {
+  visibility: hidden;
+}
+body.barcode-scanner-active .barcode-scan-overlay,
+body.barcode-scanner-active .barcode-scan-overlay * {
+  visibility: visible !important;
+}

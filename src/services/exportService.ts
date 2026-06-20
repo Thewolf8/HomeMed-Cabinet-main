@@ -5,8 +5,9 @@ import type { Medication } from '@/types/medication';
 import { EMERGENCY_ITEMS } from '@/types/medication';
 import { saveAndShareFile, savePDFFile, downloadFile } from './fileSystem';
 import { getMedications } from './medicationService';
+import { encodeHomeMedFile } from './homemedFormat';
 
-export type ExportFormat = 'pdf' | 'txt' | 'json';
+export type ExportFormat = 'pdf' | 'txt' | 'json' | 'homemed';
 
 export interface ExportOptions {
   includeNotes?: boolean;
@@ -272,6 +273,14 @@ export async function exportToJSON(): Promise<void> {
   await saveAndShareFile(content, `homemed-backup-${Date.now()}.json`, 'application/json');
 }
 
+// ==================== HomeMed Export (.homemed) ====================
+
+export async function exportToHomeMed(): Promise<void> {
+  const medications = getMedications();
+  const content = await encodeHomeMedFile(medications);
+  await saveAndShareFile(content, `homemed-share-${Date.now()}.homemed`, 'application/octet-stream');
+}
+
 // ==================== Generic Export ====================
 
 export async function exportInventory(format: ExportFormat, options: ExportOptions = {}): Promise<void> {
@@ -284,6 +293,9 @@ export async function exportInventory(format: ExportFormat, options: ExportOptio
       break;
     case 'json':
       await exportToJSON();
+      break;
+    case 'homemed':
+      await exportToHomeMed();
       break;
     default:
       throw new Error(`Unsupported export format: ${format}`);
@@ -351,6 +363,12 @@ export async function downloadInventory(format: ExportFormat, options: ExportOpt
     case 'json': {
       const content = buildJSONContent();
       const filename = `homemed-backup-${Date.now()}.json`;
+      return await downloadFile(content, filename, false);
+    }
+    case 'homemed': {
+      const medications = getMedications();
+      const content = await encodeHomeMedFile(medications);
+      const filename = `homemed-share-${Date.now()}.homemed`;
       return await downloadFile(content, filename, false);
     }
     default:

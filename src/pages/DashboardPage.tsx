@@ -13,10 +13,21 @@ import {
   X,
   CheckCircle2,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Medication, DashboardStats } from '@/types/medication';
 import { EMERGENCY_ITEMS } from '@/types/medication';
@@ -39,6 +50,9 @@ interface DashboardPageProps {
   onAddNew: () => void;
   onEdit: (id: string) => void;
   onToggleEmergencyItem: (item: string) => void;
+  /** Shown only when auto-delete-expired is OFF and at least one medication has expired. */
+  showDeleteExpired?: boolean;
+  onDeleteExpired?: () => void;
 }
 
 type StatFilter = 'all' | 'total' | 'expiringSoon' | 'expired' | 'lowStock';
@@ -95,10 +109,13 @@ export default function DashboardPage({
   onAddNew,
   onEdit,
   onToggleEmergencyItem,
+  showDeleteExpired,
+  onDeleteExpired,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
   const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showDeleteExpiredConfirm, setShowDeleteExpiredConfirm] = useState(false);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -181,6 +198,36 @@ export default function DashboardPage({
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t('appName')}</h1>
         <p className="text-muted-foreground">{t('tagline')}</p>
       </motion.div>
+
+      {/* Dynamic "Delete Expired Medications" banner — only appears when
+          auto-delete is off and the app has detected expired medications. */}
+      <AnimatePresence>
+        {showDeleteExpired && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Card className="border-red-500/30 bg-red-500/5">
+              <CardContent className="p-4 flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                <div className="p-2 rounded-lg bg-red-500/10 shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                </div>
+                <p className="text-sm flex-1 min-w-[200px]">{t('expiredDetectedBanner')}</p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setShowDeleteExpiredConfirm(true)}
+                >
+                  <Trash2 className="w-4 h-4 me-1.5" />
+                  {t('deleteExpiredButton')}
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Stats Grid */}
       <motion.div
@@ -624,6 +671,28 @@ export default function DashboardPage({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete Expired Medicines — confirmation */}
+      <AlertDialog open={showDeleteExpiredConfirm} onOpenChange={setShowDeleteExpiredConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteExpiredConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('deleteExpiredConfirmDesc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDeleteExpired?.();
+                setShowDeleteExpiredConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('deleteExpiredButton')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

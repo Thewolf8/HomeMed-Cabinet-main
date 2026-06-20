@@ -1,15 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { Medication, MedicationFilters, SortField, SortOrder } from '@/types/medication';
+import type { Medication, MedicationFilters, SortField, SortOrder, NotificationPreferences } from '@/types/medication';
 import { EMERGENCY_ITEMS } from '@/types/medication';
 import {
   getMedications,
-  addMedication,
+  addOrMergeMedication,
   updateMedication,
   deleteMedication,
+  deleteExpiredMedications,
   resetAllData,
   importMedications,
 } from '@/services/medicationService';
 import { getDaysUntilExpiration } from '@/services/exportService';
+import { getSettings } from '@/hooks/useSettings';
+import { scheduleMedicationNotifications, cancelMedicationNotifications } from '@/services/notificationService';
 
 export function useMedications() {
   const [medications, setMedications] = useState<Medication[]>([]);
@@ -23,27 +26,87 @@ export function useMedications() {
     }
   });
 
-  useEffect(() => {
-    setMedications(getMedications());
-    setLoading(false);
-  }, []);
-
   const refresh = useCallback(() => {
     setMedications(getMedications());
   }, []);
 
+  useEffect(() => {
+    const initial = getMedications();
+    setMedications(initial);
+    setLoading(false);
+
+    // Startup maintenance: runs once per app open.
+    void (async () => {
+      const settings = getSettings();
+      let dataChanged = false;
+
+      // 1) Auto-delete expired medications immediately, if the user opted in.
+      if (settings.autoDeleteExpired) {
+        const removed = deleteExpiredMedications();
+        if (removed.length > 0) {
+          await Promise.all(removed.map((m) => cancelMedicationNotifications(m.notificationIds)));
+          dataChanged = true;
+        }
+      }
+
+      // 2) Safety net: make sure every remaining medication has its system
+      // notifications scheduled (covers data created before this feature
+      // existed, or alarms cleared by the OS after a reboot/force-stop).
+      const current = getMedications();
+      for (const med of current) {
+        const hasSchedule = !!(med.notificationIds?.expiringSoon || med.notificationIds?.expired);
+        if (!hasSchedule && med.quantity > 0) {
+          const ids = await scheduleMedicationNotifications(med, settings.notifications);
+          if (ids.expiringSoon || ids.expired) {
+            updateMedication(med.id, { notificationIds: ids });
+            dataChanged = true;
+          }
+        }
+      }
+
+      if (dataChanged) refresh();
+    })();
+  }, [refresh]);
+
   const add = useCallback(
     (med: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const newMed = addMedication(med);
+      const settings = getSettings();
+      const { medication, merged } = addOrMergeMedication(med, settings.smartMergeEnabled);
+
+      void (async () => {
+        // Re-evaluate notifications for the (new or merged) medication —
+        // a merge can change the quantity from 0 to >0, which should
+        // (re)activate alerts that may not have existed before.
+        if (merged) {
+          await cancelMedicationNotifications(medication.notificationIds);
+        }
+        const notificationIds = await scheduleMedicationNotifications(medication, settings.notifications);
+        updateMedication(medication.id, { notificationIds });
+        refresh();
+      })();
+
       refresh();
-      return newMed;
+      return { medication, merged };
     },
     [refresh]
   );
 
   const update = useCallback(
     (id: string, updates: Partial<Medication>) => {
+      const before = getMedications().find((m) => m.id === id);
       const updated = updateMedication(id, updates);
+
+      if (updated) {
+        void (async () => {
+          // Cancel whatever was scheduled before, then reschedule from
+          // scratch based on the (possibly changed) expiration date/quantity.
+          await cancelMedicationNotifications(before?.notificationIds);
+          const notificationIds = await scheduleMedicationNotifications(updated, getSettings().notifications);
+          updateMedication(id, { notificationIds });
+          refresh();
+        })();
+      }
+
       refresh();
       return updated;
     },
@@ -52,23 +115,74 @@ export function useMedications() {
 
   const remove = useCallback(
     (id: string) => {
+      const before = getMedications().find((m) => m.id === id);
       const result = deleteMedication(id);
+      if (result) {
+        void cancelMedicationNotifications(before?.notificationIds);
+      }
       refresh();
       return result;
     },
     [refresh]
   );
 
+  const deleteExpired = useCallback(() => {
+    const removed = deleteExpiredMedications();
+    if (removed.length > 0) {
+      void Promise.all(removed.map((m) => cancelMedicationNotifications(m.notificationIds)));
+    }
+    refresh();
+    return removed.length;
+  }, [refresh]);
+
   const reset = useCallback(() => {
+    const before = getMedications();
     resetAllData();
+    void Promise.all(before.map((m) => cancelMedicationNotifications(m.notificationIds)));
     refresh();
   }, [refresh]);
 
   const importData = useCallback(
     (data: unknown, merge: boolean = true) => {
+      const previous = getMedications();
       const result = importMedications(data, merge);
+
+      void (async () => {
+        const settings = getSettings();
+
+        // Replacing the whole inventory: cancel every notification that
+        // belonged to the data we just wiped out.
+        if (!merge) {
+          await Promise.all(previous.map((m) => cancelMedicationNotifications(m.notificationIds)));
+        }
+
+        // (Re)schedule notifications for the inventory as it stands now —
+        // imported medications may never have had local alerts scheduled
+        // on this device.
+        const current = getMedications();
+        for (const med of current) {
+          const ids = await scheduleMedicationNotifications(med, settings.notifications);
+          updateMedication(med.id, { notificationIds: ids });
+        }
+        refresh();
+      })();
+
       refresh();
       return result;
+    },
+    [refresh]
+  );
+
+  /** Re-applies the given notification preferences to every medication currently in the cabinet. */
+  const rescheduleAllNotifications = useCallback(
+    async (prefs: NotificationPreferences) => {
+      const current = getMedications();
+      for (const med of current) {
+        await cancelMedicationNotifications(med.notificationIds);
+        const ids = await scheduleMedicationNotifications(med, prefs);
+        updateMedication(med.id, { notificationIds: ids });
+      }
+      refresh();
     },
     [refresh]
   );
@@ -203,5 +317,7 @@ export function useMedications() {
     stats,
     emergencyReadiness,
     toggleEmergencyOverride,
+    deleteExpired,
+    rescheduleAllNotifications,
   };
 }

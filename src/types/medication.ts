@@ -11,6 +11,13 @@ export interface Medication {
   prescriptionRequired: boolean;
   notes: string;
   image?: string;
+  /** Barcode / Data Matrix payload scanned from the package, used for offline auto-recognition next time. */
+  barcode?: string;
+  /** IDs of the local notifications scheduled for this medication, so they can be cancelled later. */
+  notificationIds?: {
+    expiringSoon?: number;
+    expired?: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +71,15 @@ export interface ExportPreferences {
   includeEmergencySection: boolean;
 }
 
+export interface NotificationPreferences {
+  /** Notify when a medication is approaching its expiration date. */
+  expiringSoonEnabled: boolean;
+  /** Notify exactly when a medication's expiration date is reached. */
+  expiredEnabled: boolean;
+  /** How many days before expirationDate the "expiring soon" alert should fire. */
+  daysBeforeExpiry: number;
+}
+
 export type Language = 'en' | 'ar' | 'fr' | 'system';
 export type Theme = 'dark' | 'light' | 'system';
 
@@ -74,4 +90,9 @@ export interface AppSettings {
   animationsEnabled: boolean;
   dateFormat: 'DMY' | 'MDY' | 'YMD';
   datePickerType: 'full' | 'month-year';
+  notifications: NotificationPreferences;
+  /** If true, expired medications are deleted automatically every time the app opens. */
+  autoDeleteExpired: boolean;
+  /** If true, adding a medication identical to an existing one (name + active ingredient + dosage + expiration date) merges quantities instead of creating a new entry. */
+  smartMergeEnabled: boolean;
 }

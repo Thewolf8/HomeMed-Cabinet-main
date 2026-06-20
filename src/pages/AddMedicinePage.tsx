@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pill, ImagePlus, X } from 'lucide-react';
+import { Pill, ImagePlus, X, ScanLine, Info, Loader2, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
+import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
 import { MEDICINE_FORMS, MEDICINE_CATEGORIES } from '@/types/medication';
+import {
+  scanBarcodeOnce,
+  cancelBarcodeScan,
+  findMedicationByBarcode,
+  BarcodeNotSupportedError,
+  BarcodePermissionDeniedError,
+} from '@/services/barcodeService';
 
 interface AddMedicinePageProps {
   onSave: (med: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -36,14 +51,19 @@ const initialForm = {
   prescriptionRequired: false,
   notes: '',
   image: '',
+  barcode: '',
 };
 
 export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePageProps) {
   const { t } = useI18n();
   const { settings } = useSettings();
+  const { toast } = useToast();
   const isMonthYear = settings.datePickerType === 'month-year';
   const [form, setForm] = useState(initialForm);
-  const [errors, setErrors] = useState<Record<string, string>>({}); 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [scanning, setScanning] = useState(false);
+  const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
 
   // Convert stored YYYY-MM-DD ↔ YYYY-MM for month input
   const dateInputValue = isMonthYear && form.expirationDate
@@ -52,6 +72,51 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
 
   const handleDateChange = (val: string) => {
     update('expirationDate', isMonthYear && val ? val + '-01' : val);
+  };
+
+  const handleScanBarcode = async () => {
+    setAutoFilled(false);
+    setScanning(true);
+    try {
+      const code = await scanBarcodeOnce();
+      if (!code) {
+        setScanning(false);
+        return; // user cancelled
+      }
+
+      update('barcode', code);
+
+      // Offline auto-recognition: if this barcode was linked to a medicine
+      // before, fill in the rest of the form automatically.
+      const known = findMedicationByBarcode(code);
+      if (known) {
+        setForm((prev) => ({
+          ...prev,
+          name: known.name,
+          activeIngredient: known.activeIngredient,
+          dosage: known.dosage,
+          form: known.form,
+          category: known.category,
+          usageInstructions: known.usageInstructions,
+          prescriptionRequired: known.prescriptionRequired,
+          barcode: code,
+        }));
+        setAutoFilled(true);
+        toast(t('barcodeAutoFilledToast'));
+      } else {
+        toast(t('barcodeScannedToast'));
+      }
+    } catch (err) {
+      if (err instanceof BarcodePermissionDeniedError) {
+        toast(t('barcodePermissionDenied'));
+      } else if (err instanceof BarcodeNotSupportedError) {
+        toast(t('barcodeNotSupported'));
+      } else {
+        toast(t('barcodeScanError'));
+      }
+    } finally {
+      setScanning(false);
+    }
   };
 
   const validate = () => {
@@ -69,6 +134,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
     if (!validate()) return;
     onSave({ ...form });
     setForm(initialForm);
+    setAutoFilled(false);
   };
 
   const update = (field: keyof typeof form, value: any) => {
@@ -108,9 +174,35 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="name">
-                {t('medicineName')} <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="name">
+                  {t('medicineName')} <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowBarcodeInfo(true)}
+                    className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    aria-label={t('barcodeInfoTitle')}
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleScanBarcode}
+                    disabled={scanning}
+                  >
+                    {scanning ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ScanLine className="w-4 h-4" />
+                    )}
+                    <span className="ms-1.5">{t('scanBarcode')}</span>
+                  </Button>
+                </div>
+              </div>
               <Input
                 id="name"
                 value={form.name}
@@ -119,6 +211,20 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                 className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+            </div>
+
+            {/* Barcode */}
+            <div className="space-y-1.5">
+              <Label htmlFor="barcode" className="flex items-center gap-1.5">
+                {t('barcodeField')}
+                {autoFilled && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+              </Label>
+              <Input
+                id="barcode"
+                value={form.barcode}
+                onChange={(e) => { setAutoFilled(false); update('barcode', e.target.value); }}
+                placeholder={t('barcodeFieldPlaceholder')}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -300,6 +406,41 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
           </form>
         </CardContent>
       </Card>
+
+      {/* Barcode privacy/info dialog */}
+      <Dialog open={showBarcodeInfo} onOpenChange={setShowBarcodeInfo}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanLine className="w-5 h-5 text-primary" />
+              {t('barcodeInfoTitle')}
+            </DialogTitle>
+            <DialogDescription className="text-start pt-2">
+              {t('barcodeInfoDesc')}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      {/* Camera scan overlay — shown while the native camera preview is
+          visible behind the (now transparent) WebView. See App.css. */}
+      {scanning && (
+        <div className="barcode-scan-overlay fixed inset-0 z-[9999] flex flex-col items-center justify-between py-12 px-6 pointer-events-none">
+          <div className="bg-black/60 text-white text-sm rounded-full px-4 py-2 pointer-events-none">
+            {t('barcodeScanHint')}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            className="pointer-events-auto shadow-lg"
+            onClick={() => cancelBarcodeScan()}
+          >
+            <X className="w-4 h-4 me-1.5" />
+            {t('cancel')}
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }
