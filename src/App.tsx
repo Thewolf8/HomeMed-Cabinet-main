@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { I18nProvider, useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedications } from '@/hooks/useMedications';
@@ -23,6 +25,7 @@ export type Page = 'dashboard' | 'medicines' | 'add' | 'export' | 'settings' | '
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [pageHistory, setPageHistory] = useState<Page[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [pendingHomeMedImport, setPendingHomeMedImport] = useState<HomeMedPayload | null>(null);
   const { t, dir } = useI18n();
@@ -58,20 +61,63 @@ function AppContent() {
   };
 
   const navigateTo = (page: Page) => {
+    if (page === currentPage) return;
+    setPageHistory((prev) => [...prev, currentPage]);
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleEdit = (id: string) => {
     setEditId(id);
+    setPageHistory((prev) => [...prev, currentPage]);
     setCurrentPage('edit');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAddNew = () => {
+    setPageHistory((prev) => [...prev, currentPage]);
     setCurrentPage('add');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  /**
+   * Goes back to whichever screen the user was on before the current one.
+   * Used by the hardware/gesture back button, and by every in-app
+   * "Cancel"/"Save" action so they return the user to where they actually
+   * came from instead of a hardcoded destination. If there's nothing left
+   * in the history (we're at the root), pressing back again exits the app —
+   * unless we're not on the dashboard, in which case it falls back there
+   * first as a safety net.
+   */
+  const goBack = () => {
+    setPageHistory((prev) => {
+      if (prev.length === 0) {
+        if (currentPage === 'dashboard') {
+          if (Capacitor.isNativePlatform()) CapacitorApp.exitApp();
+        } else {
+          setCurrentPage('dashboard');
+        }
+        return prev;
+      }
+      const next = [...prev];
+      const previousPage = next.pop()!;
+      setCurrentPage(previousPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return next;
+    });
+  };
+
+  // Hardware/gesture back button (Android): go back within the app's own
+  // navigation, and only exit the app once there's nowhere left to go back to.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      goBack();
+    });
+    return () => {
+      void listenerPromise.then((handle) => handle.remove());
+    };
+  }, [currentPage]);
 
   const pageVariants = {
     initial: { opacity: 0, y: 20 },
@@ -117,9 +163,9 @@ function AppContent() {
             onSave={(med) => {
               const { merged } = medHook.add(med);
               toast(merged ? t('mergedToast') : 'Medicine added successfully');
-              navigateTo('medicines');
+              goBack();
             }}
-            onCancel={() => navigateTo('medicines')}
+            onCancel={goBack}
           />
         );
       case 'edit':
@@ -134,12 +180,12 @@ function AppContent() {
             onSave={(id, updates) => {
               medHook.update(id, updates);
               toast(t('updateMedicine'));
-              navigateTo('medicines');
               setEditId(null);
+              goBack();
             }}
             onCancel={() => {
-              navigateTo('medicines');
               setEditId(null);
+              goBack();
             }}
           />
         );

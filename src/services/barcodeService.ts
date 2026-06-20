@@ -92,9 +92,12 @@ export async function scanBarcodeOnce(): Promise<string | null> {
         document.body.classList.add('barcode-scanner-active');
         await BarcodeScanner.hideBackground();
 
-        const listener = await BarcodeScanner.addListener('barcodeScanned', async (event) => {
+        const listener = await BarcodeScanner.addListener('barcodesScanned', async (event) => {
           await listener.remove();
-          finish(event.barcode?.rawValue ?? null);
+          const first = event.barcodes?.[0];
+          // rawValue is only populated for UTF-8 encoded barcodes; displayValue
+          // is ML Kit's human-readable fallback and is virtually always present.
+          finish(first?.rawValue || first?.displayValue || null);
         });
 
         await BarcodeScanner.startScan({ formats: SCAN_FORMATS });
