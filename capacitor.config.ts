@@ -13,6 +13,10 @@ const config: CapacitorConfig = {
       backgroundColor: '#0f172a',
       androidScaleType: 'CENTER_CROP',
     },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_homemed',
+      iconColor: '#0f172a',
+    },
   },
   android: {
     buildOptions: {
