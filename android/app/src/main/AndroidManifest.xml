@@ -22,6 +22,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+              Deep linking for the custom .homemed export format (Requirement V.3):
+              lets the OS open this app automatically when the user taps a
+              ".homemed" file in a file manager, WhatsApp, email, etc.
+              Two <data> entries are needed per scheme because of a long-standing
+              Android bug where a pathPattern with two consecutive ".*" wildcards
+              fails to match filenames that contain extra dots (e.g. "backup.v2.homemed").
+            -->
+            <intent-filter android:label="@string/title_activity_main">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.homemed" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\..*\\.homemed" />
+                <data android:scheme="file" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.homemed" />
+                <data android:scheme="file" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\..*\\.homemed" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -40,4 +59,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+
+    <!-- Barcode / Data Matrix scanning (Requirement IV) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Expiration alert notifications (Requirement I) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>
