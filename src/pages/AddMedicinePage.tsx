@@ -28,7 +28,6 @@ import type { Medication } from '@/types/medication';
 import { MEDICINE_FORMS, MEDICINE_CATEGORIES } from '@/types/medication';
 import {
   scanBarcodeOnce,
-  cancelBarcodeScan,
   findMedicationByBarcode,
   BarcodeNotSupportedError,
   BarcodePermissionDeniedError,
@@ -421,26 +420,6 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
           </DialogHeader>
         </DialogContent>
       </Dialog>
-
-      {/* Camera scan overlay — shown while the native camera preview is
-          visible behind the (now transparent) WebView. See App.css. */}
-      {scanning && (
-        <div className="barcode-scan-overlay fixed inset-0 z-[9999] flex flex-col items-center justify-between py-12 px-6 pointer-events-none">
-          <div className="bg-black/60 text-white text-sm rounded-full px-4 py-2 pointer-events-none">
-            {t('barcodeScanHint')}
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            className="pointer-events-auto shadow-lg"
-            onClick={() => cancelBarcodeScan()}
-          >
-            <X className="w-4 h-4 me-1.5" />
-            {t('cancel')}
-          </Button>
-        </div>
-      )}
     </motion.div>
   );
 }

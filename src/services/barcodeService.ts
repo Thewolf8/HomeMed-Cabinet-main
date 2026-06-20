@@ -1,5 +1,9 @@
 import { Capacitor } from '@capacitor/core';
-import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
+import {
+  BarcodeScanner,
+  BarcodeFormat,
+  GoogleBarcodeScannerModuleInstallState,
+} from '@capacitor-mlkit/barcode-scanning';
 import { getMedications } from './medicationService';
 import type { Medication } from '@/types/medication';
 
@@ -27,18 +31,72 @@ const SCAN_FORMATS = [
 export class BarcodeNotSupportedError extends Error {}
 export class BarcodePermissionDeniedError extends Error {}
 
-// Lets cancelBarcodeScan() (called from a "Cancel" button rendered on top of
-// the camera) resolve the *same* promise that scanBarcodeOnce() returned,
-// instead of stopping the native scan independently and leaving the caller
-// awaiting forever.
-let activeCancel: (() => void) | null = null;
+let moduleReadyChecked = false;
 
 /**
- * Opens the device camera and scans for a single barcode / Data Matrix /
- * QR code, fully on-device (the ML Kit barcode model ships inside the app,
- * so no network connection or Google Play Services download is needed).
+ * On Android, scan() depends on the "Google Barcode Scanner" module, which
+ * ships separately from the app via Google Play Services. It's already
+ * installed on the vast majority of Android phones (Play Services installs
+ * it lazily for other apps too), but if it's genuinely missing this triggers
+ * a small one-time install. That install needs Google Play Services and a
+ * network connection; everything *after* that happens fully on-device.
+ */
+async function ensureGoogleScannerModuleReady(): Promise<void> {
+  if (Capacitor.getPlatform() !== 'android' || moduleReadyChecked) return;
+
+  const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+  if (available) {
+    moduleReadyChecked = true;
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (err?: unknown) => {
+      if (settled) return;
+      settled = true;
+      void listenerPromise.then((handle) => handle.remove());
+      if (err) reject(err);
+      else resolve();
+    };
+
+    const listenerPromise = BarcodeScanner.addListener(
+      'googleBarcodeScannerModuleInstallProgress',
+      (event) => {
+        if (event.state === GoogleBarcodeScannerModuleInstallState.COMPLETED) {
+          finish();
+        } else if (
+          event.state === GoogleBarcodeScannerModuleInstallState.FAILED ||
+          event.state === GoogleBarcodeScannerModuleInstallState.CANCELED
+        ) {
+          finish(new Error('Failed to install the barcode scanner module.'));
+        }
+      }
+    );
+
+    BarcodeScanner.installGoogleBarcodeScannerModule().catch(finish);
+  });
+
+  moduleReadyChecked = true;
+}
+
+/**
+ * Opens Google's ready-to-use barcode scanner screen and returns a single
+ * decoded value, or null if the user cancelled.
  *
- * Resolves with the decoded value, or null if the user cancelled.
+ * This uses BarcodeScanner.scan() — Google's own first-party full-screen
+ * scanner UI — rather than building a custom camera preview inside the
+ * WebView. The previous approach (startScan(), with the WebView made
+ * transparent so the native camera showed through) is known to be unreliable
+ * across devices (the plugin's own issue tracker documents black screens and
+ * native crashes from it), and scan() is what Google actively recommends.
+ *
+ * Trade-off: the on-device barcode model used by scan() ships as part of
+ * Google Play Services rather than inside the app itself. It's already
+ * present on the large majority of Android phones, and once available it
+ * works fully offline — but if a specific device doesn't have it yet, the
+ * very first scan attempt needs internet access for a small one-time
+ * download (handled automatically below).
  */
 export async function scanBarcodeOnce(): Promise<string | null> {
   if (!isNative) {
@@ -50,71 +108,27 @@ export async function scanBarcodeOnce(): Promise<string | null> {
     throw new BarcodeNotSupportedError('This device does not support barcode scanning.');
   }
 
-  const permission = await BarcodeScanner.checkPermissions();
-  if (permission.camera !== 'granted' && permission.camera !== 'limited') {
-    const requested = await BarcodeScanner.requestPermissions();
-    if (requested.camera !== 'granted' && requested.camera !== 'limited') {
-      throw new BarcodePermissionDeniedError('Camera permission was denied.');
-    }
+  try {
+    await ensureGoogleScannerModuleReady();
+  } catch (err) {
+    throw new BarcodeNotSupportedError('Could not prepare the barcode scanner module.');
   }
 
-  return new Promise((resolve, reject) => {
-    let settled = false;
-
-    const cleanup = async () => {
-      try {
-        await BarcodeScanner.removeAllListeners();
-        await BarcodeScanner.stopScan();
-        await BarcodeScanner.showBackground();
-      } catch {
-        // ignore — scanner may already be stopped
-      }
-      document.body.classList.remove('barcode-scanner-active');
-      activeCancel = null;
-    };
-
-    const finish = async (value: string | null, error?: unknown) => {
-      if (settled) return;
-      settled = true;
-      await cleanup();
-      if (error) reject(error);
-      else resolve(value);
-    };
-
-    activeCancel = () => finish(null);
-
-    (async () => {
-      try {
-        // The native camera preview renders *behind* the WebView, so the
-        // WebView itself must be made visually transparent for the user to
-        // see it — both the CSS class (App.css) and this plugin call are
-        // required.
-        document.body.classList.add('barcode-scanner-active');
-        await BarcodeScanner.hideBackground();
-
-        const listener = await BarcodeScanner.addListener('barcodesScanned', async (event) => {
-          await listener.remove();
-          const first = event.barcodes?.[0];
-          // rawValue is only populated for UTF-8 encoded barcodes; displayValue
-          // is ML Kit's human-readable fallback and is virtually always present.
-          finish(first?.rawValue || first?.displayValue || null);
-        });
-
-        await BarcodeScanner.startScan({ formats: SCAN_FORMATS });
-      } catch (err) {
-        finish(null, err);
-      }
-    })();
-  });
-}
-
-/**
- * Cancels an in-progress scan started by scanBarcodeOnce() — call this from
- * the "Cancel" button the page renders on top of the camera preview. Safe to
- * call even if no scan is active.
- */
-export function cancelBarcodeScan(): void {
-  activeCancel?.();
+  try {
+    const { barcodes } = await BarcodeScanner.scan({ formats: SCAN_FORMATS });
+    const first = barcodes?.[0];
+    // rawValue is only populated for UTF-8 encoded barcodes; displayValue is
+    // ML Kit's human-readable fallback and is virtually always present.
+    return first?.rawValue || first?.displayValue || null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // The user backing out of Google's scanner screen surfaces as a rejected
+    // promise rather than an empty result — treat that as a cancellation,
+    // not an error.
+    if (/cancel/i.test(message)) return null;
+    if (/permission/i.test(message)) throw new BarcodePermissionDeniedError(message);
+    throw err;
+  }
 }
 
 /**
