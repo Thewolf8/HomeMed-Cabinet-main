@@ -7,6 +7,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:theme="@style/AppTheme">
 
         <activity
@@ -42,6 +43,16 @@
             </intent-filter>
 
         </activity>
+
+        <!--
+          Required by @capacitor-mlkit/barcode-scanning so the on-device
+          barcode-scanning UI dependencies are bundled/loaded correctly.
+          Without this tag, startScan() opens the camera permission-wise but
+          never actually produces a working preview/scan.
+        -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
