@@ -314,18 +314,19 @@ export default function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="notif-expiring"
+                checked={settings.notifications.expiringSoonEnabled}
+                onCheckedChange={(checked) => handleNotificationToggle('expiringSoonEnabled', !!checked)}
+                className="mt-0.5"
+              />
               <div>
                 <Label htmlFor="notif-expiring" className="cursor-pointer font-medium">
                   {t('notifExpiringSoon')}
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">{t('notifExpiringSoonDesc')}</p>
               </div>
-              <Switch
-                id="notif-expiring"
-                checked={settings.notifications.expiringSoonEnabled}
-                onCheckedChange={(checked) => handleNotificationToggle('expiringSoonEnabled', checked)}
-              />
             </div>
 
             {settings.notifications.expiringSoonEnabled && (
@@ -349,18 +350,19 @@ export default function SettingsPage({
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+            <div className="flex items-start gap-3 pt-3 border-t border-border">
+              <Checkbox
+                id="notif-expired"
+                checked={settings.notifications.expiredEnabled}
+                onCheckedChange={(checked) => handleNotificationToggle('expiredEnabled', !!checked)}
+                className="mt-0.5"
+              />
               <div>
                 <Label htmlFor="notif-expired" className="cursor-pointer font-medium">
                   {t('notifExpired')}
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">{t('notifExpiredDesc')}</p>
               </div>
-              <Switch
-                id="notif-expired"
-                checked={settings.notifications.expiredEnabled}
-                onCheckedChange={(checked) => handleNotificationToggle('expiredEnabled', checked)}
-              />
             </div>
 
             {!settings.notifications.expiringSoonEnabled && !settings.notifications.expiredEnabled && (
@@ -406,18 +408,19 @@ export default function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="auto-delete"
+                checked={settings.autoDeleteExpired}
+                onCheckedChange={(checked) => setAutoDeleteExpired(!!checked)}
+                className="mt-0.5"
+              />
               <div>
                 <Label htmlFor="auto-delete" className="cursor-pointer font-medium">
                   {t('autoDeleteToggle')}
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">{t('autoDeleteDesc')}</p>
               </div>
-              <Switch
-                id="auto-delete"
-                checked={settings.autoDeleteExpired}
-                onCheckedChange={(checked) => setAutoDeleteExpired(checked)}
-              />
             </div>
           </CardContent>
         </Card>
