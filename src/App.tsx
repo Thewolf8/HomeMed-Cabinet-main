@@ -144,6 +144,8 @@ function AppContent() {
               const count = medHook.deleteExpired();
               if (count > 0) toast(t('deleteExpiredSuccess'));
             }}
+            dueReminders={medHook.dueReminders}
+            onConfirmDose={medHook.confirmDose}
           />
         );
       case 'medicines':
