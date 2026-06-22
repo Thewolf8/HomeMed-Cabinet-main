@@ -25,7 +25,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n/I18nContext';
@@ -390,18 +389,19 @@ export default function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="smart-merge"
+                checked={settings.smartMergeEnabled}
+                onCheckedChange={(checked) => setSmartMergeEnabled(!!checked)}
+                className="mt-0.5"
+              />
               <div>
                 <Label htmlFor="smart-merge" className="cursor-pointer font-medium">
                   {t('smartMergeToggle')}
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">{t('smartMergeDesc')}</p>
               </div>
-              <Switch
-                id="smart-merge"
-                checked={settings.smartMergeEnabled}
-                onCheckedChange={(checked) => setSmartMergeEnabled(checked)}
-              />
             </div>
           </CardContent>
         </Card>

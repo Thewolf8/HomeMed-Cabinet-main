@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, ImagePlus, X, ScanLine, Info, Loader2, MapPin } from 'lucide-react';
+import { Pencil, ImagePlus, X, ScanLine, Info, Loader2, MapPin, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,8 @@ import {
   BarcodeNotSupportedError,
   BarcodePermissionDeniedError,
 } from '@/services/barcodeService';
+import DoseReminderEditor from '@/components/DoseReminderEditor';
+import { reminderToDraft, draftToReminder } from '@/services/doseReminderService';
 
 interface EditMedicinePageProps {
   medId: string;
@@ -49,11 +51,15 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
   const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
+  const [reminderDraft, setReminderDraft] = useState(() =>
+    reminderToDraft(null)
+  );
 
   useEffect(() => {
     const med = getMedicationById(medId);
     if (med) {
       setForm(med);
+      setReminderDraft(reminderToDraft(med.reminder));
     }
   }, [medId]);
 
@@ -100,6 +106,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form || !validate()) return;
+    const reminder = draftToReminder(reminderDraft, form.reminder);
     onSave(medId, {
       name: form.name,
       activeIngredient: form.activeIngredient,
@@ -115,6 +122,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       barcode: form.barcode,
       storageLocation: form.storageLocation,
       storageLocationNote: form.storageLocationNote,
+      reminder: reminder ?? undefined,
     });
   };
 
@@ -349,38 +357,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
               )}
             </div>
 
-            {/* Storage Location */}
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" />
-                {t('storageLocation')}
-              </Label>
-              <Select
-                value={form.storageLocation ?? 'none'}
-                onValueChange={(v) => update('storageLocation', v === 'none' ? undefined : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('storageLocationPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('storageLocationNone')}</SelectItem>
-                  {STORAGE_LOCATIONS.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {t(`storage_${loc}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.storageLocation === 'other' && (
-                <Input
-                  value={form.storageLocationNote ?? ''}
-                  onChange={(e) => update('storageLocationNote', e.target.value)}
-                  placeholder={t('storageLocationNotePlaceholder')}
-                  className="mt-2"
-                />
-              )}
-            </div>
-
             {/* Usage Instructions */}
             <div className="space-y-1.5">
               <Label htmlFor="usageInstructions">{t('usageInstructions')}</Label>
@@ -447,6 +423,19 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                   />
                 </label>
               )}
+            </div>
+
+            {/* Dose Reminder */}
+            <div className="space-y-1.5 pt-2 border-t border-border">
+              <Label className="flex items-center gap-1.5 pt-2">
+                <Bell className="w-3.5 h-3.5" />
+                {t('reminderSectionTitle')}
+              </Label>
+              <DoseReminderEditor
+                draft={reminderDraft}
+                onChange={setReminderDraft}
+                dosageHint={form.dosage}
+              />
             </div>
 
             {/* Actions */}

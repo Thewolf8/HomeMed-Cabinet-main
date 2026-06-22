@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
+  Bell,
+  Clock,
+  BellOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +37,11 @@ import { EMERGENCY_ITEMS } from '@/types/medication';
 import type { Page } from '@/App';
 import { getDaysUntilExpiration } from '@/services/exportService';
 
+interface DueReminderEntry {
+  medication: Medication;
+  dueTimes: string[];
+}
+
 interface DashboardPageProps {
   medications: Medication[];
   stats: DashboardStats;
@@ -53,6 +61,9 @@ interface DashboardPageProps {
   /** Shown only when auto-delete-expired is OFF and at least one medication has expired. */
   showDeleteExpired?: boolean;
   onDeleteExpired?: () => void;
+  /** Medications with a dose currently overdue (time passed, not yet confirmed today). */
+  dueReminders?: DueReminderEntry[];
+  onConfirmDose?: (medId: string, doseTime: string, taken: boolean) => void;
 }
 
 type StatFilter = 'all' | 'total' | 'expiringSoon' | 'expired' | 'lowStock';
@@ -111,6 +122,8 @@ export default function DashboardPage({
   onToggleEmergencyItem,
   showDeleteExpired,
   onDeleteExpired,
+  dueReminders = [],
+  onConfirmDose,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
   const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
@@ -346,6 +359,62 @@ export default function DashboardPage({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Dose Reminders Widget ─────────────────────────────────── */}
+      {dueReminders.length > 0 ? (
+        <motion.div variants={itemVariants} initial="hidden" animate="visible">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="w-4 h-4 text-primary" />
+                {t('reminderWidgetTitle')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dueReminders.map(({ medication, dueTimes }) => (
+                <div key={medication.id} className="space-y-2">
+                  <p className="text-sm font-medium">{medication.name} · {medication.dosage}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {dueTimes.map((time) => (
+                      <div key={time} className="flex items-center gap-1.5 bg-background rounded-lg border border-border px-3 py-1.5">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">{time}</span>
+                        <Button
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => onConfirmDose?.(medication.id, time, true)}
+                        >
+                          <CheckCircle2 className="w-3 h-3 me-1" />
+                          {t('doseTaken')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => onConfirmDose?.(medication.id, time, false)}
+                        >
+                          {t('doseSnooze')}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : (
+        medications.some((m) => m.reminder?.enabled) && (
+          <motion.div variants={itemVariants} initial="hidden" animate="visible">
+            <Card className="border-border/50">
+              <CardContent className="flex items-center gap-3 py-4">
+                <BellOff className="w-4 h-4 text-muted-foreground shrink-0" />
+                <p className="text-sm text-muted-foreground">{t('reminderWidgetAllDone')}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Emergency Readiness */}
