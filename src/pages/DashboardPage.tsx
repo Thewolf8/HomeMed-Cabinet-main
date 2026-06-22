@@ -36,6 +36,7 @@ import type { Medication, DashboardStats } from '@/types/medication';
 import { EMERGENCY_ITEMS } from '@/types/medication';
 import type { Page } from '@/App';
 import { getDaysUntilExpiration } from '@/services/exportService';
+import { reconcileReminderDay } from '@/services/doseReminderService';
 
 interface DueReminderEntry {
   medication: Medication;
@@ -58,10 +59,10 @@ interface DashboardPageProps {
   onAddNew: () => void;
   onEdit: (id: string) => void;
   onToggleEmergencyItem: (item: string) => void;
-  /** Shown only when auto-delete-expired is OFF and at least one medication has expired. */
   showDeleteExpired?: boolean;
   onDeleteExpired?: () => void;
-  /** Medications with a dose currently overdue (time passed, not yet confirmed today). */
+  /** All medications with an enabled reminder (shown in the widget regardless of time). */
+  activeReminders?: Medication[];
   dueReminders?: DueReminderEntry[];
   onConfirmDose?: (medId: string, doseTime: string, taken: boolean) => void;
 }
@@ -122,6 +123,7 @@ export default function DashboardPage({
   onToggleEmergencyItem,
   showDeleteExpired,
   onDeleteExpired,
+  activeReminders = [],
   dueReminders = [],
   onConfirmDose,
 }: DashboardPageProps) {
@@ -129,6 +131,10 @@ export default function DashboardPage({
   const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showDeleteExpiredConfirm, setShowDeleteExpiredConfirm] = useState(false);
+  // Tracks times where the user pressed "لا / Not yet" this session,
+  // so we can immediately show the follow-up "تناولتها" prompt without
+  // waiting for the snooze notification to fire.
+  const [snoozedTimes, setSnoozedTimes] = useState<Record<string, string[]>>({});
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -361,7 +367,7 @@ export default function DashboardPage({
       </AnimatePresence>
 
       {/* ── Dose Reminders Widget ─────────────────────────────────── */}
-      {dueReminders.length > 0 ? (
+      {activeReminders.length > 0 && (
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <Card className="border-primary/30 bg-primary/5">
             <CardHeader className="pb-3">
@@ -370,50 +376,116 @@ export default function DashboardPage({
                 {t('reminderWidgetTitle')}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {dueReminders.map(({ medication, dueTimes }) => (
-                <div key={medication.id} className="space-y-2">
-                  <p className="text-sm font-medium">{medication.name} · {medication.dosage}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {dueTimes.map((time) => (
-                      <div key={time} className="flex items-center gap-1.5 bg-background rounded-lg border border-border px-3 py-1.5">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-xs text-muted-foreground">{time}</span>
-                        <Button
-                          size="sm"
-                          className="h-6 text-xs px-2"
-                          onClick={() => onConfirmDose?.(medication.id, time, true)}
-                        >
-                          <CheckCircle2 className="w-3 h-3 me-1" />
-                          {t('doseTaken')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-xs px-2"
-                          onClick={() => onConfirmDose?.(medication.id, time, false)}
-                        >
-                          {t('doseSnooze')}
-                        </Button>
-                      </div>
-                    ))}
+            <CardContent className="space-y-4">
+              {activeReminders.map((med) => {
+                const reminder = reconcileReminderDay(med.reminder!);
+                const now = new Date();
+                const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                const medSnoozed = snoozedTimes[med.id] ?? [];
+
+                return (
+                  <div key={med.id} className="space-y-2">
+                    {/* Medication header */}
+                    <p className="text-sm font-semibold">{med.name}
+                      <span className="text-muted-foreground font-normal"> · {med.dosage}</span>
+                    </p>
+
+                    {/* One row per dose time */}
+                    <div className="space-y-1.5">
+                      {reminder.times.map((time) => {
+                        const [h, m] = time.split(':').map(Number);
+                        const timeMinutes = h * 60 + m;
+                        const isPast = timeMinutes <= nowMinutes;
+                        const isConfirmed = reminder.confirmedToday.includes(time);
+                        const isSnoozed = medSnoozed.includes(time);
+
+                        // ✓ Already confirmed today
+                        if (isConfirmed) {
+                          return (
+                            <div key={time} className="flex items-center gap-2 text-xs text-muted-foreground opacity-60">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              <span>{time}</span>
+                              <span>{t('doseTaken')}</span>
+                            </div>
+                          );
+                        }
+
+                        // After pressing "لا" — show follow-up prompt only
+                        if (isSnoozed) {
+                          return (
+                            <div key={time} className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span className="text-xs text-amber-600 dark:text-amber-400 flex-1">
+                                {time} — {t('doseSnoozePrompt')}
+                              </span>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  onConfirmDose?.(med.id, time, true);
+                                  setSnoozedTimes((prev) => ({
+                                    ...prev,
+                                    [med.id]: (prev[med.id] ?? []).filter((t) => t !== time),
+                                  }));
+                                }}
+                              >
+                                <CheckCircle2 className="w-3 h-3 me-1" />
+                                {t('doseTaken')}
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        // Overdue and not yet answered — show Yes / No
+                        if (isPast) {
+                          return (
+                            <div key={time} className="flex items-center gap-2 rounded-lg border border-red-400/30 bg-red-500/5 px-3 py-2 flex-wrap">
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                              <span className="text-xs font-medium flex-1 min-w-0">{time} — {t('doseDuePrompt')}</span>
+                              <div className="flex gap-1.5 shrink-0">
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => onConfirmDose?.(med.id, time, true)}
+                                >
+                                  <CheckCircle2 className="w-3 h-3 me-1" />
+                                  {t('doseTaken')}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    onConfirmDose?.(med.id, time, false);
+                                    setSnoozedTimes((prev) => ({
+                                      ...prev,
+                                      [med.id]: [...(prev[med.id] ?? []), time],
+                                    }));
+                                  }}
+                                >
+                                  {t('doseSnooze')}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Future — show quietly as upcoming
+                        return (
+                          <div key={time} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span>{time}</span>
+                            <span className="opacity-60">{t('reminderUpcoming')}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </motion.div>
-      ) : (
-        medications.some((m) => m.reminder?.enabled) && (
-          <motion.div variants={itemVariants} initial="hidden" animate="visible">
-            <Card className="border-border/50">
-              <CardContent className="flex items-center gap-3 py-4">
-                <BellOff className="w-4 h-4 text-muted-foreground shrink-0" />
-                <p className="text-sm text-muted-foreground">{t('reminderWidgetAllDone')}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

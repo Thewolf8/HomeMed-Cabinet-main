@@ -315,6 +315,8 @@ export const translations = {
     doseDuePrompt: 'Dose overdue — have you taken it?',
     doseTaken: 'Yes, taken',
     doseSnooze: 'Not yet',
+    doseSnoozePrompt: 'Have you taken it yet?',
+    reminderUpcoming: 'upcoming',
 
     // Auto-Backup
     autoBackupTitle: 'Auto-Backup',
@@ -647,6 +649,8 @@ export const translations = {
     doseDuePrompt: 'حان موعد جرعتك — هل تناولتها؟',
     doseTaken: 'نعم، تناولته',
     doseSnooze: 'ليس بعد',
+    doseSnoozePrompt: 'هل تناولتها بعد؟',
+    reminderUpcoming: 'قادم',
 
     // Auto-Backup
     autoBackupTitle: 'النسخ الاحتياطي التلقائي',
@@ -979,6 +983,8 @@ export const translations = {
     doseDuePrompt: 'Dose en retard — avez-vous pris votre médicament ?',
     doseTaken: 'Oui, pris',
     doseSnooze: 'Pas encore',
+    doseSnoozePrompt: 'L\'avez-vous prise ?',
+    reminderUpcoming: 'à venir',
 
     // Auto-Backup
     autoBackupTitle: 'Sauvegarde automatique',

@@ -145,6 +145,7 @@ function AppContent() {
               if (count > 0) toast(t('deleteExpiredSuccess'));
             }}
             dueReminders={medHook.dueReminders}
+            activeReminders={medHook.activeReminders}
             onConfirmDose={medHook.confirmDose}
           />
         );

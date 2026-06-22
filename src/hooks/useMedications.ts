@@ -350,6 +350,9 @@ export function useMedications() {
     .map((m) => ({ medication: m, dueTimes: getDueTimes(m.reminder!) }))
     .filter((entry) => entry.dueTimes.length > 0);
 
+  /** ALL medications that have an active reminder, regardless of whether a dose is currently due. */
+  const activeReminders = medications.filter((m) => m.reminder?.enabled);
+
   const toggleEmergencyOverride = useCallback((item: string) => {
     setManuallyPresent((prev) => {
       const next = prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item];
@@ -494,5 +497,6 @@ export function useMedications() {
     removeReminder,
     confirmDose,
     dueReminders,
+    activeReminders,
   };
 }
