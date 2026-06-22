@@ -18,6 +18,9 @@ import {
   BellOff,
   CalendarX2,
   Layers,
+  Archive,
+  RotateCcw,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +54,8 @@ interface SettingsPageProps {
   onResetData: () => void;
   onImport: (data: unknown, merge: boolean) => { success: number; failed: number };
   onRescheduleNotifications: (prefs: NotificationPreferences) => void;
+  onRestoreAutoBackup: () => Promise<void>;
+  onWriteBackupNow: () => Promise<void>;
   toast: any;
 }
 
@@ -71,6 +76,8 @@ export default function SettingsPage({
   onResetData,
   onImport,
   onRescheduleNotifications,
+  onRestoreAutoBackup,
+  onWriteBackupNow,
   toast,
   onSettingsChange,
 }: SettingsPageProps) {
@@ -458,6 +465,43 @@ export default function SettingsPage({
         </Card>
 
         {/* Import / Export Data */}
+        {/* ── Auto-Backup ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Archive className="w-4 h-4" />
+              {t('autoBackupTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t('autoBackupDesc')}</p>
+
+            <Button
+              variant="outline"
+              className="w-full justify-between"
+              onClick={async () => { await onWriteBackupNow(); }}
+            >
+              <span className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                {t('autoBackupWriteNow')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-between"
+              onClick={async () => { await onRestoreAutoBackup(); }}
+            >
+              <span className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4" />
+                {t('autoBackupRestore')}
+              </span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">

@@ -4,8 +4,6 @@ import {
   Search,
   SlidersHorizontal,
   ArrowUpDown,
-  Pencil,
-  Trash2,
   ChevronDown,
   ChevronUp,
   PackageOpen,
@@ -17,14 +15,16 @@ import {
   HeartPulse,
   Stethoscope,
   HelpCircle,
+  Bell,
+  MapPin,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useI18n } from '@/i18n/I18nContext';
-import type { Medication, MedicationFilters, SortField, SortOrder, MedicineCategory } from '@/types/medication';
-import { MEDICINE_CATEGORIES } from '@/types/medication';
+import type { Medication, MedicationFilters, SortField, SortOrder, MedicineCategory, DoseReminder } from '@/types/medication';
+import { MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import {
   AlertDialog,
@@ -44,27 +44,33 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ToastType } from '@/hooks/use-toast';
+import MedicineBottomSheet from '@/components/MedicineBottomSheet';
 
 interface MedicinesPageProps {
   medications: Medication[];
   onEdit: (id: string) => void;
   onDelete: (id: string) => boolean;
   onAddNew: () => void;
+  onSetReminder: (id: string, reminder: DoseReminder) => void;
+  onRemoveReminder: (id: string) => void;
+  onConfirmDose: (id: string, doseTime: string, taken: boolean) => void;
   toast: ToastType;
 }
 
-export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew, toast }: MedicinesPageProps) {
+export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew, onSetReminder, onRemoveReminder, onConfirmDose, toast }: MedicinesPageProps) {
   const { t, isRTL } = useI18n();
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [bottomSheetMed, setBottomSheetMed] = useState<Medication | null>(null);
 
   const [filters, setFilters] = useState<MedicationFilters>({
     search: '',
     category: 'all',
     expiration: 'all',
     emergencyOnly: false,
+    storageLocation: 'all',
   });
 
   const [sortField, setSortField] = useState<SortField>('name');
@@ -112,6 +118,10 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
 
   if (filters.emergencyOnly) {
     filtered = filtered.filter((med) => med.category === 'emergency');
+  }
+
+  if (filters.storageLocation !== 'all') {
+    filtered = filtered.filter((med) => med.storageLocation === filters.storageLocation);
   }
 
   filtered.sort((a, b) => {
@@ -303,13 +313,39 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      setFilters({ search: '', category: 'all', expiration: 'all', emergencyOnly: false });
+                      setFilters({ search: '', category: 'all', expiration: 'all', emergencyOnly: false, storageLocation: 'all' });
                       setSearch('');
                     }}
                   >
                     <X className="w-3 h-3 mr-1" />
                     {t('close')}
                   </Button>
+                </div>
+
+                {/* Storage Location filter */}
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {t('storageLocation')}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      variant={filters.storageLocation === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilters((prev) => ({ ...prev, storageLocation: 'all' }))}
+                    >
+                      {t('all')}
+                    </Button>
+                    {STORAGE_LOCATIONS.map((loc) => (
+                      <Button
+                        key={loc}
+                        variant={filters.storageLocation === loc ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setFilters((prev) => ({ ...prev, storageLocation: loc }))}
+                      >
+                        {t(`storage_${loc}`)}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -360,7 +396,7 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
                     <CardContent className="p-4">
                       {/* Main row */}
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0" onClick={() => setExpandedId(isExpanded ? null : med.id)}>
+                        <div className="flex-1 min-w-0" onClick={() => setBottomSheetMed(med)}>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-sm truncate">{med.name}</h3>
                             {getExpirationBadge(med)}
@@ -476,6 +512,17 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Medication detail bottom sheet */}
+      <MedicineBottomSheet
+        medication={bottomSheetMed}
+        onClose={() => setBottomSheetMed(null)}
+        onEdit={(id) => { onEdit(id); setBottomSheetMed(null); }}
+        onDelete={(id) => { setDeleteId(id); setBottomSheetMed(null); }}
+        onSetReminder={onSetReminder}
+        onRemoveReminder={onRemoveReminder}
+        onConfirmDose={onConfirmDose}
+      />
     </div>
   );
 }

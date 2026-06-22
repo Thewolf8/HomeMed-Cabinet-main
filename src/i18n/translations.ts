@@ -283,6 +283,51 @@ export const translations = {
     homemedImportCancel: 'Cancel',
     homemedImportSuccess: 'HomeMed file imported successfully',
     homemedImportError: 'This .homemed file could not be read',
+
+    // Storage Location
+    storageLocation: 'Storage Location',
+    storageLocationPlaceholder: 'Where is it stored?',
+    storageLocationNone: 'Not specified',
+    storageLocationNotePlaceholder: 'Describe the location…',
+    storage_fridge: 'Fridge',
+    storage_firstAidKit: 'First Aid Kit',
+    storage_drawer: 'Drawer',
+    storage_cabinet: 'Cabinet',
+    storage_kitchen: 'Kitchen',
+    storage_bedroom: 'Bedroom',
+    storage_other: 'Other',
+
+    // Dose Reminders
+    reminderSectionTitle: 'Dose Reminder',
+    reminderEnable: 'Enable dose reminders',
+    reminderEnableDesc: 'Get a daily alert and automatically deduct stock when confirmed',
+    reminderDoseMg: 'Your dose (mg)',
+    reminderUnitConcentration: 'Per tablet/unit (mg)',
+    reminderTimesPerDay: 'Times per day',
+    reminderTimesLabel: 'Reminder times',
+    reminderMathHint: 'Each dose = {fraction} unit · {perDay} units deducted per day',
+    reminderActive: 'Reminder',
+    reminderSetup: 'Set up dose reminder',
+    reminderSave: 'Save reminder',
+    reminderRemove: 'Remove',
+    doseDuePrompt: 'Dose overdue — have you taken it?',
+    doseTaken: 'Yes, taken',
+    doseSnooze: 'Not yet',
+
+    // Auto-Backup
+    autoBackupTitle: 'Auto-Backup',
+    autoBackupDesc: 'A single backup file (HM-backup.json) is saved weekly to Documents/homemed-backups/ and refreshed automatically on each app open.',
+    autoBackupWriteNow: 'Back up now',
+    autoBackupRestore: 'Restore from auto-backup',
+    backupRestoreNotFound: 'No auto-backup file found',
+    backupRestoreSuccess: 'Data restored from auto-backup',
+    backupWriteSuccess: 'Backup saved successfully',
+    backupWriteFailed: 'Backup could not be saved',
+
+    // Misc additions
+    expiresToday: 'Expires today',
+    units: 'units',
+    all: 'All',
   },
   
   ar: {
@@ -568,6 +613,51 @@ export const translations = {
     homemedImportCancel: 'إلغاء',
     homemedImportSuccess: 'تم استيراد ملف هوميد بنجاح',
     homemedImportError: 'تعذرت قراءة ملف .homemed هذا',
+
+    // Storage Location
+    storageLocation: 'مكان التخزين',
+    storageLocationPlaceholder: 'أين يُحفظ؟',
+    storageLocationNone: 'غير محدد',
+    storageLocationNotePlaceholder: 'صِف المكان…',
+    storage_fridge: 'الثلاجة',
+    storage_firstAidKit: 'حقيبة الإسعافات',
+    storage_drawer: 'الدرج',
+    storage_cabinet: 'الخزانة',
+    storage_kitchen: 'المطبخ',
+    storage_bedroom: 'غرفة النوم',
+    storage_other: 'أخرى',
+
+    // Dose Reminders
+    reminderSectionTitle: 'تذكير بالجرعة',
+    reminderEnable: 'تفعيل تذكير الجرعة',
+    reminderEnableDesc: 'تنبيه يومي مع خصم تلقائي من المخزون عند التأكيد',
+    reminderDoseMg: 'جرعتك (ملغ)',
+    reminderUnitConcentration: 'لكل حبة/وحدة (ملغ)',
+    reminderTimesPerDay: 'مرات يومياً',
+    reminderTimesLabel: 'أوقات التذكير',
+    reminderMathHint: 'كل جرعة = {fraction} حبة · {perDay} حبة تُخصم يومياً',
+    reminderActive: 'تذكير',
+    reminderSetup: 'إعداد تذكير الجرعة',
+    reminderSave: 'حفظ التذكير',
+    reminderRemove: 'حذف',
+    doseDuePrompt: 'حان موعد جرعتك — هل تناولتها؟',
+    doseTaken: 'نعم، تناولته',
+    doseSnooze: 'ليس بعد',
+
+    // Auto-Backup
+    autoBackupTitle: 'النسخ الاحتياطي التلقائي',
+    autoBackupDesc: 'يُحفظ ملف نسخ احتياطي واحد (HM-backup.json) أسبوعياً في Documents/homemed-backups/ ويُحدَّث تلقائياً عند كل فتح للتطبيق.',
+    autoBackupWriteNow: 'نسخ احتياطي الآن',
+    autoBackupRestore: 'الاسترجاع من النسخة التلقائية',
+    backupRestoreNotFound: 'لم يُعثر على ملف نسخ احتياطي',
+    backupRestoreSuccess: 'تمت استعادة البيانات من النسخة الاحتياطية',
+    backupWriteSuccess: 'تم حفظ النسخة الاحتياطية',
+    backupWriteFailed: 'تعذر حفظ النسخة الاحتياطية',
+
+    // Misc additions
+    expiresToday: 'تنتهي اليوم',
+    units: 'وحدة',
+    all: 'الكل',
   },
   
   fr: {
@@ -853,5 +943,50 @@ export const translations = {
     homemedImportCancel: 'Annuler',
     homemedImportSuccess: 'Fichier HomeMed importé avec succès',
     homemedImportError: 'Ce fichier .homemed n\'a pas pu être lu',
+
+    // Storage Location
+    storageLocation: 'Lieu de stockage',
+    storageLocationPlaceholder: 'Où est-il rangé ?',
+    storageLocationNone: 'Non précisé',
+    storageLocationNotePlaceholder: 'Décrire l\'emplacement…',
+    storage_fridge: 'Réfrigérateur',
+    storage_firstAidKit: 'Trousse de secours',
+    storage_drawer: 'Tiroir',
+    storage_cabinet: 'Armoire',
+    storage_kitchen: 'Cuisine',
+    storage_bedroom: 'Chambre',
+    storage_other: 'Autre',
+
+    // Dose Reminders
+    reminderSectionTitle: 'Rappel de dose',
+    reminderEnable: 'Activer les rappels de dose',
+    reminderEnableDesc: 'Alerte quotidienne avec déduction automatique du stock à la confirmation',
+    reminderDoseMg: 'Votre dose (mg)',
+    reminderUnitConcentration: 'Par comprimé/unité (mg)',
+    reminderTimesPerDay: 'Fois par jour',
+    reminderTimesLabel: 'Heures de rappel',
+    reminderMathHint: 'Chaque dose = {fraction} comprimé · {perDay} comprimés déduits par jour',
+    reminderActive: 'Rappel',
+    reminderSetup: 'Configurer le rappel de dose',
+    reminderSave: 'Enregistrer le rappel',
+    reminderRemove: 'Supprimer',
+    doseDuePrompt: 'Dose en retard — avez-vous pris votre médicament ?',
+    doseTaken: 'Oui, pris',
+    doseSnooze: 'Pas encore',
+
+    // Auto-Backup
+    autoBackupTitle: 'Sauvegarde automatique',
+    autoBackupDesc: 'Un fichier de sauvegarde unique (HM-backup.json) est enregistré chaque semaine dans Documents/homemed-backups/ et actualisé automatiquement à chaque ouverture de l\'application.',
+    autoBackupWriteNow: 'Sauvegarder maintenant',
+    autoBackupRestore: 'Restaurer depuis la sauvegarde auto',
+    backupRestoreNotFound: 'Aucun fichier de sauvegarde automatique trouvé',
+    backupRestoreSuccess: 'Données restaurées depuis la sauvegarde automatique',
+    backupWriteSuccess: 'Sauvegarde enregistrée avec succès',
+    backupWriteFailed: 'Impossible d\'enregistrer la sauvegarde',
+
+    // Misc additions
+    expiresToday: 'Expire aujourd\'hui',
+    units: 'unités',
+    all: 'Tout',
   },
 } as const;

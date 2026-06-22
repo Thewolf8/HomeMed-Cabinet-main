@@ -17,6 +17,7 @@ const defaultSettings: AppSettings = {
   },
   autoDeleteExpired: false,
   smartMergeEnabled: true,
+  backup: { lastBackupAt: null },
 };
 
 function loadSettings(): AppSettings {
@@ -29,6 +30,7 @@ function loadSettings(): AppSettings {
         ...parsed,
         exportPreferences: { ...defaultSettings.exportPreferences, ...(parsed.exportPreferences ?? {}) },
         notifications: { ...defaultSettings.notifications, ...(parsed.notifications ?? {}) },
+        backup: { ...defaultSettings.backup, ...(parsed.backup ?? {}) },
       };
     }
   } catch {}
@@ -63,6 +65,11 @@ function dispatch(next: AppSettings) {
 /** Synchronous snapshot of the current settings — safe to call outside React components. */
 export function getSettings(): AppSettings {
   return { ..._s };
+}
+
+/** Non-hook setter for use outside React components (e.g. startup maintenance code). */
+export function setLastBackupAtDirect(lastBackupAt: string | null) {
+  dispatch({ ..._s, backup: { ..._s.backup, lastBackupAt } });
 }
 
 export function useSettings() {
@@ -117,6 +124,9 @@ export function useSettings() {
   const setSmartMergeEnabled = useCallback(
     (smartMergeEnabled: boolean) => dispatch({ ..._s, smartMergeEnabled }), []);
 
+  const setLastBackupAt = useCallback(
+    (lastBackupAt: string | null) => setLastBackupAtDirect(lastBackupAt), []);
+
   return {
     settings,
     setLanguage,
@@ -129,5 +139,6 @@ export function useSettings() {
     setNotificationPreference,
     setAutoDeleteExpired,
     setSmartMergeEnabled,
+    setLastBackupAt,
   };
 }

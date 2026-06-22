@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pill, ImagePlus, X, ScanLine, Info, Loader2, CheckCircle2 } from 'lucide-react';
+import { Pill, ImagePlus, X, ScanLine, Info, Loader2, CheckCircle2, Bell, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,13 +25,15 @@ import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
-import { MEDICINE_FORMS, MEDICINE_CATEGORIES } from '@/types/medication';
+import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
 import {
   scanBarcodeOnce,
   findMedicationByBarcode,
   BarcodeNotSupportedError,
   BarcodePermissionDeniedError,
 } from '@/services/barcodeService';
+import DoseReminderEditor, { emptyReminderDraft } from '@/components/DoseReminderEditor';
+import { draftToReminder } from '@/services/doseReminderService';
 
 interface AddMedicinePageProps {
   onSave: (med: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -51,6 +53,8 @@ const initialForm = {
   notes: '',
   image: '',
   barcode: '',
+  storageLocation: undefined as Medication['storageLocation'],
+  storageLocationNote: '',
 };
 
 export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePageProps) {
@@ -63,6 +67,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const [scanning, setScanning] = useState(false);
   const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
+  const [reminderDraft, setReminderDraft] = useState(emptyReminderDraft());
 
   // Convert stored YYYY-MM-DD ↔ YYYY-MM for month input
   const dateInputValue = isMonthYear && form.expirationDate
@@ -98,6 +103,8 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
           category: known.category,
           usageInstructions: known.usageInstructions,
           prescriptionRequired: known.prescriptionRequired,
+          storageLocation: known.storageLocation,
+          storageLocationNote: known.storageLocationNote ?? '',
           barcode: code,
         }));
         setAutoFilled(true);
@@ -131,9 +138,11 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    onSave({ ...form });
+    const reminder = draftToReminder(reminderDraft);
+    onSave({ ...form, reminder });
     setForm(initialForm);
     setAutoFilled(false);
+    setReminderDraft(emptyReminderDraft());
   };
 
   const update = (field: keyof typeof form, value: any) => {
@@ -325,6 +334,38 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
               </div>
             </div>
 
+            {/* Storage Location */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                {t('storageLocation')}
+              </Label>
+              <Select
+                value={form.storageLocation ?? 'none'}
+                onValueChange={(v) => update('storageLocation', v === 'none' ? undefined : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('storageLocationPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('storageLocationNone')}</SelectItem>
+                  {STORAGE_LOCATIONS.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {t(`storage_${loc}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.storageLocation === 'other' && (
+                <Input
+                  value={form.storageLocationNote}
+                  onChange={(e) => update('storageLocationNote', e.target.value)}
+                  placeholder={t('storageLocationNotePlaceholder')}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
             {/* Usage Instructions */}
             <div className="space-y-1.5">
               <Label htmlFor="usageInstructions">{t('usageInstructions')}</Label>
@@ -391,6 +432,15 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                   />
                 </label>
               )}
+            </div>
+
+            {/* Dose Reminder */}
+            <div className="space-y-1.5 pt-2 border-t border-border">
+              <Label className="flex items-center gap-1.5 pt-2">
+                <Bell className="w-3.5 h-3.5" />
+                {t('reminderSectionTitle')}
+              </Label>
+              <DoseReminderEditor draft={reminderDraft} onChange={setReminderDraft} dosageHint={form.dosage} />
             </div>
 
             {/* Actions */}

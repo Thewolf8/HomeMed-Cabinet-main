@@ -180,3 +180,50 @@ export async function downloadFile(
 
   return `Documents/${path}`;
 }
+
+// ==================== Fixed-filename weekly auto-backup ====================
+// A single, always-overwritten file (rather than the timestamped exports
+// above) so the backup doesn't pile up files in the user's Documents folder.
+
+const AUTO_BACKUP_PATH = 'homemed-backups/HM-backup.json';
+
+/** Writes (overwrites) the single auto-backup file with the given JSON content. */
+export async function writeAutoBackup(content: string): Promise<void> {
+  if (!isNative) return; // No meaningful "fixed file on disk" concept on web.
+  await Filesystem.writeFile({
+    path: AUTO_BACKUP_PATH,
+    data: content,
+    directory: Directory.Documents,
+    encoding: Encoding.UTF8,
+    recursive: true,
+  });
+}
+
+/** Reads the auto-backup file's content, or null if it doesn't exist / can't be read. */
+export async function readAutoBackup(): Promise<string | null> {
+  if (!isNative) return null;
+  try {
+    const result = await Filesystem.readFile({
+      path: AUTO_BACKUP_PATH,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+    });
+    return result.data as string;
+  } catch {
+    return null;
+  }
+}
+
+/** Returns the auto-backup file's last-modified time (ms since epoch), or null if it doesn't exist. */
+export async function getAutoBackupModifiedTime(): Promise<number | null> {
+  if (!isNative) return null;
+  try {
+    const stat = await Filesystem.stat({
+      path: AUTO_BACKUP_PATH,
+      directory: Directory.Documents,
+    });
+    return stat.mtime ?? null;
+  } catch {
+    return null;
+  }
+}

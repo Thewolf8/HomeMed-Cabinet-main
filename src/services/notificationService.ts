@@ -48,22 +48,27 @@ function notifStrings() {
 
 /**
  * Deterministically turns a medication's (string) id into a stable positive
- * 32-bit integer, because @capacitor/local-notifications requires numeric ids.
- * Two distinct ids are derived per medication (expiringSoon / expired) so each
- * alert can be scheduled and cancelled independently.
+ * integer well within Java's 32-bit int range, because
+ * @capacitor/local-notifications requires numeric ids and Android notification
+ * ids are backed by a native int (max 2,147,483,647).
+ *
+ * Exported so other notification "namespaces" (e.g. dose reminders) can
+ * derive their own non-colliding ids from the same medication id by adding
+ * a distinct offset on top of this base.
  */
-function hashToInt(input: string): number {
+export function hashToInt(input: string): number {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     hash = (hash << 5) - hash + input.charCodeAt(i);
     hash |= 0; // force 32-bit
   }
-  // Keep it positive and leave the low bit free for the two notification kinds
-  return Math.abs(hash) * 2;
+  // Constrain well below int32 max so callers have headroom to multiply/offset
+  // (e.g. *2, +1) without ever risking overflow into an invalid native id.
+  return Math.abs(hash) % 500_000_000;
 }
 
 function idsForMedication(medId: string): { expiringSoon: number; expired: number } {
-  const base = hashToInt(medId);
+  const base = hashToInt(medId) * 2;
   return { expiringSoon: base, expired: base + 1 };
 }
 

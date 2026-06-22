@@ -7,6 +7,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { useMedications } from '@/hooks/useMedications';
 import { useToast } from '@/hooks/use-toast';
 import { registerHomeMedFileListener } from '@/services/deepLinkService';
+import { readAutoBackupMedications, writeBackupNow } from '@/services/backupService';
 import type { HomeMedPayload } from '@/services/homemedFormat';
 
 import MobileNav from '@/components/MobileNav';
@@ -153,6 +154,9 @@ function AppContent() {
             onEdit={handleEdit}
             onDelete={medHook.remove}
             onAddNew={handleAddNew}
+            onSetReminder={medHook.setReminder}
+            onRemoveReminder={medHook.removeReminder}
+            onConfirmDose={medHook.confirmDose}
             toast={toast}
           />
         );
@@ -210,6 +214,16 @@ function AppContent() {
             onResetData={medHook.reset}
             onImport={medHook.importData}
             onRescheduleNotifications={medHook.rescheduleAllNotifications}
+            onRestoreAutoBackup={async () => {
+              const meds = await readAutoBackupMedications();
+              if (!meds) { toast(t('backupRestoreNotFound')); return; }
+              medHook.importData(meds, false);
+              toast(t('backupRestoreSuccess'));
+            }}
+            onWriteBackupNow={async () => {
+              const ok = await writeBackupNow();
+              toast(ok ? t('backupWriteSuccess') : t('backupWriteFailed'));
+            }}
             toast={toast}
           />
         );

@@ -1,3 +1,30 @@
+export interface DoseReminder {
+  enabled: boolean;
+  /** The dose required per intake, in mg (e.g. 500). */
+  doseMg: number;
+  /** How many mg are in a single tablet/capsule/unit (e.g. 1000). Used to convert the dose into a fraction of a unit. */
+  unitConcentrationMg: number;
+  /** Number of intakes per day — also the length of `times`. */
+  timesPerDay: number;
+  /** Clock times ("HH:mm", 24h, local time) for each daily intake. */
+  times: string[];
+  /** Running fractional accumulator (0 ≤ x < 1) of partially-consumed units, carried between confirmations so quantity only drops by whole units. */
+  consumedFraction: number;
+  /** IDs of the scheduled daily-repeating notifications (one per entry in `times`), for cancellation. */
+  notificationIds: number[];
+  /** ID of a pending one-off "snooze" follow-up notification, if the user answered "No" to the last prompt. */
+  snoozeNotificationId?: number;
+  /** Which of today's `times` have already been confirmed (taken or manually logged). */
+  confirmedToday: string[];
+  /** The date (YYYY-MM-DD) `confirmedToday` applies to — reset automatically when the date rolls over. */
+  confirmedDate: string;
+}
+
+export type StorageLocation = 'fridge' | 'firstAidKit' | 'drawer' | 'cabinet' | 'kitchen' | 'bedroom' | 'other';
+export const STORAGE_LOCATIONS: StorageLocation[] = [
+  'fridge', 'firstAidKit', 'drawer', 'cabinet', 'kitchen', 'bedroom', 'other',
+];
+
 export interface Medication {
   id: string;
   name: string;
@@ -18,6 +45,12 @@ export interface Medication {
     expiringSoon?: number;
     expired?: number;
   };
+  /** Where this medication is physically stored at home. */
+  storageLocation?: StorageLocation;
+  /** Free-text detail for storageLocation === 'other' (or extra detail for any location). */
+  storageLocationNote?: string;
+  /** Smart dose reminder / stock-sync configuration. */
+  reminder?: DoseReminder;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,9 +63,10 @@ export interface MedicationFilters {
   category: MedicineCategory | 'all';
   expiration: 'all' | 'expired' | 'expiring-soon' | 'valid';
   emergencyOnly: boolean;
+  storageLocation: StorageLocation | 'all';
 }
 
-export type SortField = 'expirationDate' | 'name' | 'quantity' | 'category';
+export type SortField = 'expirationDate' | 'name' | 'quantity' | 'category' | 'storageLocation';
 export type SortOrder = 'asc' | 'desc';
 
 export interface DashboardStats {
@@ -83,6 +117,11 @@ export interface NotificationPreferences {
 export type Language = 'en' | 'ar' | 'fr' | 'system';
 export type Theme = 'dark' | 'light' | 'system';
 
+export interface BackupPreferences {
+  /** ISO timestamp of the last successful automatic backup write. */
+  lastBackupAt: string | null;
+}
+
 export interface AppSettings {
   language: Language;
   theme: Theme;
@@ -95,4 +134,5 @@ export interface AppSettings {
   autoDeleteExpired: boolean;
   /** If true, adding a medication identical to an existing one (name + active ingredient + dosage + expiration date) merges quantities instead of creating a new entry. */
   smartMergeEnabled: boolean;
+  backup: BackupPreferences;
 }

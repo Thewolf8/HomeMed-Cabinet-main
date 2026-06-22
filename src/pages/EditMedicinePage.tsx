@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, ImagePlus, X, ScanLine, Info, Loader2 } from 'lucide-react';
+import { Pencil, ImagePlus, X, ScanLine, Info, Loader2, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import {
 import { useI18n } from '@/i18n/I18nContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
-import { MEDICINE_FORMS, MEDICINE_CATEGORIES } from '@/types/medication';
+import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
 import { getMedicationById } from '@/services/medicationService';
 import {
   scanBarcodeOnce,
@@ -113,6 +113,8 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       notes: form.notes,
       image: form.image,
       barcode: form.barcode,
+      storageLocation: form.storageLocation,
+      storageLocationNote: form.storageLocationNote,
     });
   };
 
@@ -313,6 +315,70 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                   </Button>
                 ))}
               </div>
+            </div>
+
+            {/* Storage Location */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                {t('storageLocation')}
+              </Label>
+              <Select
+                value={form.storageLocation ?? 'none'}
+                onValueChange={(v) => update('storageLocation', v === 'none' ? undefined : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('storageLocationPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('storageLocationNone')}</SelectItem>
+                  {STORAGE_LOCATIONS.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {t(`storage_${loc}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.storageLocation === 'other' && (
+                <Input
+                  value={form.storageLocationNote ?? ''}
+                  onChange={(e) => update('storageLocationNote', e.target.value)}
+                  placeholder={t('storageLocationNotePlaceholder')}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
+            {/* Storage Location */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                {t('storageLocation')}
+              </Label>
+              <Select
+                value={form.storageLocation ?? 'none'}
+                onValueChange={(v) => update('storageLocation', v === 'none' ? undefined : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('storageLocationPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('storageLocationNone')}</SelectItem>
+                  {STORAGE_LOCATIONS.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {t(`storage_${loc}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.storageLocation === 'other' && (
+                <Input
+                  value={form.storageLocationNote ?? ''}
+                  onChange={(e) => update('storageLocationNote', e.target.value)}
+                  placeholder={t('storageLocationNotePlaceholder')}
+                  className="mt-2"
+                />
+              )}
             </div>
 
             {/* Usage Instructions */}
