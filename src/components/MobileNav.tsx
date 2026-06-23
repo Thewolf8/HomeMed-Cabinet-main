@@ -55,7 +55,7 @@ export default function MobileNav({ currentPage, onNavigate, onAddNew }: MobileN
                   />
                 )}
                 <div
-                  className={`transition-all duration-200 ${\
+                  className={`transition-all duration-200 ${
                     isAdd
                       ? 'bg-primary text-primary-foreground rounded-xl p-2 shadow-md shadow-primary/30'
                       : isActive
