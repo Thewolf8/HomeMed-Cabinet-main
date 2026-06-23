@@ -164,6 +164,7 @@ export const translations = {
     importSuccessDesc: 'Your medicines have been imported successfully.',
     importError: 'Import Failed',
     importErrorDesc: 'Invalid backup file format.',
+    importInvalidStructure: 'Invalid backup file structure.',
     importConfirm: 'This will merge imported medicines with your existing list. Continue?',
     mergeImport: 'Merge with existing data',
     replaceImport: 'Replace all data',
@@ -334,7 +335,7 @@ export const translations = {
 
     // Auto-Backup
     autoBackupTitle: 'Auto-Backup',
-    autoBackupDesc: 'A single backup file (HM-backup.json) is saved weekly to Documents/homemed-backups/ and refreshed automatically on each app open.',
+    autoBackupDesc: 'A single backup file (HM-backup.json) is saved automatically to secure internal storage (Android/data/) and refreshed weekly. No external storage permissions required.',
     autoBackupWriteNow: 'Back up now',
     autoBackupRestore: 'Restore from auto-backup',
     backupRestoreNotFound: 'No auto-backup file found',
@@ -346,6 +347,15 @@ export const translations = {
     expiresToday: 'Expires today',
     units: 'units',
     all: 'All',
+
+    // Help & FAQ
+    faqTitle: 'Help & FAQ',
+    faqQ1: 'What is a .homemed file?',
+    faqA1: 'A .homemed file is HomeMed Cabinet\'s native backup format. It holds your entire medicine inventory, compressed and encoded for safe transfer. Use it to back up your data, move it to another device, or restore after a reinstall — just tap "Import" in Settings to load it back.',
+    faqQ2: 'How does the Dose Reminder work?',
+    faqA2: 'Once a reminder is set for a medicine, the app schedules a daily notification at each chosen time. When you confirm taking a dose, HomeMed automatically deducts the equivalent quantity from your stock — so your inventory always reflects what is actually left.',
+    faqQ3: 'Is my medical data private?',
+    faqA3: '100% of your medical data is stored exclusively on your device. HomeMed Cabinet has no servers, no cloud sync, and no analytics. Nothing ever leaves your phone — your health information is completely private and available offline at all times.',
   },
   
   ar: {
@@ -512,6 +522,7 @@ export const translations = {
     importSuccessDesc: 'تم استيراد الأدوية بنجاح.',
     importError: 'فشل الاستيراد',
     importErrorDesc: 'تنسيق ملف النسخ الاحتياطي غير صالح.',
+    importInvalidStructure: 'هيكل ملف النسخة الاحتياطية غير صالح.',
     importConfirm: 'سيتم دمج الأدوية المستوردة مع قائمتك الحالية. هل تريد المتابعة؟',
     mergeImport: 'دمج مع البيانات الموجودة',
     replaceImport: 'استبدال جميع البيانات',
@@ -682,7 +693,7 @@ export const translations = {
 
     // Auto-Backup
     autoBackupTitle: 'النسخ الاحتياطي التلقائي',
-    autoBackupDesc: 'يُحفظ ملف نسخ احتياطي واحد (HM-backup.json) أسبوعياً في Documents/homemed-backups/ ويُحدَّث تلقائياً عند كل فتح للتطبيق.',
+    autoBackupDesc: 'يُحفظ ملف نسخ احتياطي واحد (HM-backup.json) تلقائياً في مساحة التخزين الداخلية الآمنة (Android/data/) ويُحدَّث أسبوعياً. لا حاجة إلى أذونات تخزين خارجي.',
     autoBackupWriteNow: 'نسخ احتياطي الآن',
     autoBackupRestore: 'الاسترجاع من النسخة التلقائية',
     backupRestoreNotFound: 'لم يُعثر على ملف نسخ احتياطي',
@@ -694,6 +705,15 @@ export const translations = {
     expiresToday: 'تنتهي اليوم',
     units: 'وحدة',
     all: 'الكل',
+
+    // Help & FAQ
+    faqTitle: 'المساعدة والأسئلة الشائعة',
+    faqQ1: 'ما هو ملف .homemed؟',
+    faqA1: 'ملف .homemed هو تنسيق النسخ الاحتياطي الخاص بتطبيق خزانة هوميد. يحتوي على بيانات مخزون أدويتك بالكامل، مضغوطة ومشفرة للنقل الآمن. استخدمه لحفظ نسخة احتياطية، أو نقل البيانات بين الأجهزة، أو الاستعادة بعد إعادة التثبيت — فقط اضغط على "استيراد" في الإعدادات لتحميله.',
+    faqQ2: 'كيف يعمل تذكير الجرعة؟',
+    faqA2: 'عند تفعيل التذكير لدواء معين، يُجدول التطبيق إشعاراً يومياً في كل وقت محدد. وعند تأكيد أخذ الجرعة، يُطرح التطبيق تلقائياً الكمية المقابلة من المخزون — مما يجعل المخزون يعكس دائماً ما تبقى فعلياً.',
+    faqQ3: 'هل بياناتي الطبية خاصة؟',
+    faqA3: '100٪ من بياناتك الطبية محفوظة حصرياً على جهازك. ليس لخزانة هوميد أي خوادم أو مزامنة سحابية أو تحليلات. لا شيء يغادر هاتفك أبداً — معلوماتك الصحية خاصة تماماً ومتاحة دون اتصال بالإنترنت في أي وقت.',
   },
   
   fr: {
@@ -860,6 +880,7 @@ export const translations = {
     importSuccessDesc: 'Vos médicaments ont été importés avec succès.',
     importError: 'Import Échoué',
     importErrorDesc: 'Format de fichier de sauvegarde invalide.',
+    importInvalidStructure: 'Structure du fichier de sauvegarde invalide.',
     importConfirm: 'Cela fusionnera les médicaments importés avec votre liste existante. Continuer?',
     mergeImport: 'Fusionner avec les données existantes',
     replaceImport: 'Remplacer toutes les données',
@@ -1030,7 +1051,7 @@ export const translations = {
 
     // Auto-Backup
     autoBackupTitle: 'Sauvegarde automatique',
-    autoBackupDesc: 'Un fichier de sauvegarde unique (HM-backup.json) est enregistré chaque semaine dans Documents/homemed-backups/ et actualisé automatiquement à chaque ouverture de l\'application.',
+    autoBackupDesc: 'Un fichier de sauvegarde unique (HM-backup.json) est enregistré automatiquement dans le stockage interne sécurisé (Android/data/) et actualisé chaque semaine. Aucune permission de stockage externe requise.',
     autoBackupWriteNow: 'Sauvegarder maintenant',
     autoBackupRestore: 'Restaurer depuis la sauvegarde auto',
     backupRestoreNotFound: 'Aucun fichier de sauvegarde automatique trouvé',
@@ -1042,5 +1063,14 @@ export const translations = {
     expiresToday: 'Expire aujourd\'hui',
     units: 'unités',
     all: 'Tout',
+
+    // Help & FAQ
+    faqTitle: 'Aide et FAQ',
+    faqQ1: 'Qu\'est-ce qu\'un fichier .homemed ?',
+    faqA1: 'Un fichier .homemed est le format de sauvegarde natif de HomeMed Cabinet. Il contient l\'intégralité de votre inventaire de médicaments, compressé et encodé pour un transfert sécurisé. Utilisez-le pour sauvegarder vos données, les transférer sur un autre appareil, ou restaurer après une réinstallation — appuyez simplement sur "Importer" dans les Paramètres.',
+    faqQ2: 'Comment fonctionne le rappel de dose ?',
+    faqA2: 'Lorsqu\'un rappel est configuré pour un médicament, l\'application planifie une notification quotidienne à chaque heure choisie. Quand vous confirmez avoir pris une dose, HomeMed déduit automatiquement la quantité correspondante de votre stock — ainsi votre inventaire reflète toujours ce qu\'il reste réellement.',
+    faqQ3: 'Mes données médicales sont-elles privées ?',
+    faqA3: '100 % de vos données médicales sont stockées exclusivement sur votre appareil. HomeMed Cabinet n\'a ni serveurs, ni synchronisation cloud, ni analyses. Rien ne quitte jamais votre téléphone — vos informations de santé sont totalement privées et disponibles hors ligne à tout moment.',
   },
 } as const;
