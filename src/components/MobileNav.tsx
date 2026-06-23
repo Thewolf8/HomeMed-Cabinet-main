@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Pill, PlusCircle, Download, Settings } from 'lucide-react';
+import { LayoutDashboard, Pill, PlusCircle, Download, Settings, ClipboardList } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Page } from '@/App';
 
@@ -16,6 +16,7 @@ export default function MobileNav({ currentPage, onNavigate, onAddNew }: MobileN
     { page: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
     { page: 'medicines', label: t('medicines'), icon: Pill },
     { page: 'add', label: t('add'), icon: PlusCircle },
+    { page: 'history', label: t('history'), icon: ClipboardList },
     { page: 'export', label: t('export'), icon: Download },
     { page: 'settings', label: t('settings'), icon: Settings },
   ];
@@ -54,7 +55,7 @@ export default function MobileNav({ currentPage, onNavigate, onAddNew }: MobileN
                   />
                 )}
                 <div
-                  className={`transition-all duration-200 ${
+                  className={`transition-all duration-200 ${\
                     isAdd
                       ? 'bg-primary text-primary-foreground rounded-xl p-2 shadow-md shadow-primary/30'
                       : isActive
@@ -62,11 +63,9 @@ export default function MobileNav({ currentPage, onNavigate, onAddNew }: MobileN
                       : 'p-1.5 rounded-xl'
                   }`}
                 >
-                  <Icon size={isAdd ? 24 : 20} />
+                  <Icon size={isAdd ? 22 : 18} />
                 </div>
-                <span className="text-[10px] mt-0.5">
-                  {item.label}
-                </span>
+                <span className="text-[9px] mt-0.5 leading-tight">{item.label}</span>
               </button>
             );
           })}

@@ -44,11 +44,21 @@ export default function MedicineBottomSheet({
     reminderToDraft(medication?.reminder)
   );
 
-  // Reset reminder draft whenever a new medication opens.
+  // Sync the reminder draft whenever the medication prop changes — either
+  // because a different medication was tapped (id changes) or because the
+  // same medication's reminder was just saved/removed (id stays the same
+  // but the reminder object itself changes). Using a stable JSON string as
+  // the dependency is safe here because the object is small and this only
+  // runs when the parent genuinely passes a new reference.
   useEffect(() => {
     setReminderDraft(reminderToDraft(medication?.reminder));
-    setShowReminderEditor(false);
-  }, [medication?.id]);
+    // Only collapse the editor when switching to a completely different
+    // medication — keep it open if the user just saved a new reminder so
+    // they can see the result without extra taps.
+    if (!medication?.reminder?.enabled) {
+      setShowReminderEditor(false);
+    }
+  }, [medication?.id, JSON.stringify(medication?.reminder)]);
 
   if (!medication) return null;
 
