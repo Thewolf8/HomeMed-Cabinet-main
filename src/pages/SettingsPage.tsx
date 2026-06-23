@@ -21,16 +21,24 @@ import {
   Archive,
   RotateCcw,
   Download,
+  HelpCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import type { AppSettings, Language, Theme, NotificationPreferences } from '@/types/medication';
 import { readFileFromInput } from '@/services/fileSystem';
+import { decodeHomeMedFile } from '@/services/homemedFormat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,20 +127,74 @@ export default function SettingsPage({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      const content = await readFileFromInput(file);
-      const data = JSON.parse(content);
+    const filename = file.name.toLowerCase();
 
-      if (data.medications && Array.isArray(data.medications)) {
-        setImportData(data.medications);
+    try {
+      // ── Branch A: native .homemed format ───────────────────────────────
+      if (filename.endsWith('.homemed')) {
+        const content = await readFileFromInput(file);
+        let payload;
+        try {
+          payload = await decodeHomeMedFile(content);
+        } catch {
+          toast(t('importInvalidStructure'));
+          e.target.value = '';
+          return;
+        }
+        // Structural guard — must have a valid medicines array
+        if (!payload || !Array.isArray(payload.medications)) {
+          toast(t('importInvalidStructure'));
+          e.target.value = '';
+          return;
+        }
+        setImportData(payload.medications);
         setShowImportDialog(true);
-      } else if (Array.isArray(data)) {
+        e.target.value = '';
+        return;
+      }
+
+      // ── Branch B: standard JSON backup ─────────────────────────────────
+      const content = await readFileFromInput(file);
+
+      let data: unknown;
+      try {
+        data = JSON.parse(content);
+      } catch {
+        // Unparseable — not valid JSON at all
+        toast(t('importInvalidStructure'));
+        e.target.value = '';
+        return;
+      }
+
+      // Guard: must be an object or array — reject nulls / primitives
+      if (data === null || typeof data !== 'object') {
+        toast(t('importInvalidStructure'));
+        e.target.value = '';
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        // Bare array of medicine objects
         setImportData(data);
         setShowImportDialog(true);
       } else {
-        toast(t('importError'));
+        const obj = data as Record<string, unknown>;
+
+        // Structural integrity check — `medications` key must be an array
+        if ('medications' in obj && Array.isArray(obj.medications)) {
+          setImportData(obj.medications);
+          setShowImportDialog(true);
+        } else if ('medicines' in obj && Array.isArray(obj.medicines)) {
+          // Tolerate alternate key name used by some older exports
+          setImportData(obj.medicines);
+          setShowImportDialog(true);
+        } else {
+          // File parsed but has none of the expected structural keys
+          toast(t('importInvalidStructure'));
+        }
       }
     } catch {
+      // Catch-all for unexpected I/O or decode errors
       toast(t('importError'));
     }
 
@@ -513,7 +575,7 @@ export default function SettingsPage({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json,application/json"
+              accept=".json,.homemed,application/json"
               className="hidden"
               onChange={handleFileChange}
             />
@@ -555,6 +617,52 @@ export default function SettingsPage({
             <p className="text-sm text-muted-foreground">{t('privacyText2')}</p>
             <p className="text-sm text-muted-foreground">{t('privacyText3')}</p>
             <p className="text-sm text-muted-foreground">{t('privacyText4')}</p>
+          </CardContent>
+        </Card>
+
+        {/* ── Help & FAQ ─────────────────────────────────── */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <HelpCircle className="w-4 h-4" />
+              {t('faqTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-2">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="faq-1">
+                <AccordionTrigger className="text-sm font-medium text-start hover:no-underline">
+                  {t('faqQ1')}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {t('faqA1')}
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="faq-2">
+                <AccordionTrigger className="text-sm font-medium text-start hover:no-underline">
+                  {t('faqQ2')}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {t('faqA2')}
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="faq-3">
+                <AccordionTrigger className="text-sm font-medium text-start hover:no-underline">
+                  {t('faqQ3')}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {t('faqA3')}
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 
