@@ -22,7 +22,9 @@ import ImportConflictModal from '@/components/ImportConflictModal';
 
 import './App.css';
 
-export type Page = 'dashboard' | 'medicines' | 'add' | 'export' | 'settings' | 'edit';
+import HistoryPage from '@/pages/HistoryPage';
+
+export type Page = 'dashboard' | 'medicines' | 'add' | 'export' | 'settings' | 'edit' | 'history';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -196,6 +198,8 @@ function AppContent() {
             }}
           />
         );
+      case 'history':
+        return <HistoryPage key="history" />;
       case 'export':
         return (
           <ExportPage

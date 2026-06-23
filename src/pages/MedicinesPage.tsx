@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -66,6 +66,19 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bottomSheetMed, setBottomSheetMed] = useState<Medication | null>(null);
+
+  // Keep bottomSheetMed in sync with the medications array.
+  // When setReminder/removeReminder triggers a refresh(), the medications
+  // prop updates but bottomSheetMed is still the stale object from when the
+  // sheet was opened — this effect replaces it with the fresh version so the
+  // sheet re-renders immediately without needing to close and reopen.
+  useEffect(() => {
+    if (!bottomSheetMed) return;
+    const updated = medications.find((m) => m.id === bottomSheetMed.id);
+    if (updated && updated !== bottomSheetMed) {
+      setBottomSheetMed(updated);
+    }
+  }, [medications]);
 
   const [filters, setFilters] = useState<MedicationFilters>({
     search: '',

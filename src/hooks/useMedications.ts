@@ -31,6 +31,7 @@ import {
   registerDoseActionListener,
 } from '@/services/doseReminderService';
 import { checkAndRunAutoBackup } from '@/services/backupService';
+import { addDoseLog } from '@/services/doseLogService';
 
 export function useMedications() {
   const [medications, setMedications] = useState<Medication[]>([]);
@@ -312,6 +313,23 @@ export function useMedications() {
 
         if (taken) {
           const { newQuantity, newConsumedFraction } = computeDoseDeduction(reminder, med.quantity);
+          const unitsDeducted = med.quantity - newQuantity;
+
+          // Write an immutable log entry — this is the only place where
+          // confirmed doses are recorded so the history is always accurate.
+          addDoseLog({
+            medicationId: med.id,
+            medicationName: med.name,
+            activeIngredient: med.activeIngredient,
+            dosage: med.dosage,
+            doseMg: reminder.doseMg,
+            unitsDeducted,
+            quantityAfter: newQuantity,
+            scheduledTime: doseTime,
+            confirmedAt: new Date().toISOString(),
+            source: 'reminder',
+          });
+
           finalReminder = {
             ...finalReminder,
             consumedFraction: newConsumedFraction,
