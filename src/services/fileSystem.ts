@@ -182,10 +182,17 @@ export async function downloadFile(
 }
 
 // ==================== Fixed-filename weekly auto-backup ====================
-// A single, always-overwritten file (rather than the timestamped exports
-// above) so the backup doesn't pile up files in the user's Documents folder.
+// A single, always-overwritten file stored in Directory.Data, which maps to
+// Android/data/[package_name]/files/ — scoped internal storage that is:
+//   • Isolated from other apps (no external app can read it without root)
+//   • Exempt from the WRITE_EXTERNAL_STORAGE permission (zero runtime prompts)
+//   • Automatically removed by the OS when the user uninstalls the app
+//
+// Manual exports (downloadFile above) still target Directory.Documents so the
+// user can retrieve those files from Files / Downloads at any time.
 
-const AUTO_BACKUP_PATH = 'homemed-backups/HM-backup.json';
+const AUTO_BACKUP_DIR = Directory.Data;
+const AUTO_BACKUP_PATH = 'HM-backup.json';
 
 /** Writes (overwrites) the single auto-backup file with the given JSON content. */
 export async function writeAutoBackup(content: string): Promise<void> {
@@ -193,7 +200,7 @@ export async function writeAutoBackup(content: string): Promise<void> {
   await Filesystem.writeFile({
     path: AUTO_BACKUP_PATH,
     data: content,
-    directory: Directory.Documents,
+    directory: AUTO_BACKUP_DIR,
     encoding: Encoding.UTF8,
     recursive: true,
   });
@@ -205,7 +212,7 @@ export async function readAutoBackup(): Promise<string | null> {
   try {
     const result = await Filesystem.readFile({
       path: AUTO_BACKUP_PATH,
-      directory: Directory.Documents,
+      directory: AUTO_BACKUP_DIR,
       encoding: Encoding.UTF8,
     });
     return result.data as string;
@@ -220,7 +227,7 @@ export async function getAutoBackupModifiedTime(): Promise<number | null> {
   try {
     const stat = await Filesystem.stat({
       path: AUTO_BACKUP_PATH,
-      directory: Directory.Documents,
+      directory: AUTO_BACKUP_DIR,
     });
     return stat.mtime ?? null;
   } catch {
