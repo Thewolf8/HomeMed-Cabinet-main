@@ -19,7 +19,10 @@ import {
 } from '@/services/medicationService';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import { getSettings } from '@/hooks/useSettings';
-import { scheduleMedicationNotifications, cancelMedicationNotifications } from '@/services/notificationService';
+import {
+  scheduleMedicationNotifications,
+  cancelMedicationNotifications,
+} from '@/services/notificationService';
 import {
   scheduleDoseReminders,
   cancelDoseReminders,
@@ -32,38 +35,68 @@ import {
 } from '@/services/doseReminderService';
 import { checkAndRunAutoBackup } from '@/services/backupService';
 import { addDoseLog } from '@/services/doseLogService';
+import {
+  getProfileReminders,
+  saveProfileReminders,
+  setProfileReminder,
+  removeProfileReminder as removeProfileReminderSvc,
+  clearAllProfileScopedData,
+  getProfiles,
+} from '@/services/profileService';
+import { useProfile } from '@/context/ProfileContext';
+
+// ── Helper ────────────────────────────────────────────────────────────────────
+
+/** Merges per-profile reminders over the shared medication base objects. */
+function mergeReminders(
+  base: Medication[],
+  profileId: string,
+): Medication[] {
+  const map = getProfileReminders(profileId);
+  return base.map((med) => ({ ...med, reminder: map[med.id] }));
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useMedications() {
+  const { activeProfile } = useProfile();
+  const activeProfileId = activeProfile.id;
+
+  // A ref that always holds the latest profileId so stable callbacks can
+  // still read the current value without re-creating themselves on every switch.
+  const profileIdRef = useRef(activeProfileId);
+  profileIdRef.current = activeProfileId;
+
   const [medications, setMedications] = useState<Medication[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]         = useState(true);
   const [manuallyPresent, setManuallyPresent] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('homemed-emergency-overrides');
       return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   });
 
+  // Stable refresh — reads the current profileId from the ref so
+  // the startup effect never needs to re-run when the profile changes.
   const refresh = useCallback(() => {
-    setMedications(getMedications());
+    const base = getMedications();
+    setMedications(mergeReminders(base, profileIdRef.current));
   }, []);
 
-  // Holds the latest confirmDose implementation, so the notification-action
-  // listener registered in the startup effect below never calls a stale closure.
-  const confirmDoseRef = useRef<((medId: string, doseTime: string, taken: boolean) => void) | null>(null);
+  // Ref so the notification-action listener never goes stale.
+  const confirmDoseRef = useRef<((medId: string, time: string, taken: boolean) => void) | null>(null);
 
+  // ── Startup effect (runs once on mount) ────────────────────────────────────
   useEffect(() => {
-    const initial = getMedications();
-    setMedications(initial);
+    const base = getMedications();
+    setMedications(mergeReminders(base, activeProfileId));
     setLoading(false);
 
-    // Startup maintenance: runs once per app open.
     void (async () => {
       const settings = getSettings();
       let dataChanged = false;
 
-      // 1) Auto-delete expired medications immediately, if the user opted in.
+      // 1) Auto-delete expired medications.
       if (settings.autoDeleteExpired) {
         const removed = deleteExpiredMedications();
         if (removed.length > 0) {
@@ -72,9 +105,7 @@ export function useMedications() {
         }
       }
 
-      // 2) Safety net: make sure every remaining medication has its system
-      // notifications scheduled (covers data created before this feature
-      // existed, or alarms cleared by the OS after a reboot/force-stop).
+      // 2) Safety net: (re)schedule expiry notifications for all medications.
       const current = getMedications();
       for (const med of current) {
         const hasSchedule = !!(med.notificationIds?.expiringSoon || med.notificationIds?.expired);
@@ -85,114 +116,182 @@ export function useMedications() {
             dataChanged = true;
           }
         }
-        // Same safety net for dose reminders.
-        if (med.reminder?.enabled && (!med.reminder.notificationIds || med.reminder.notificationIds.length === 0)) {
-          const notificationIds = await scheduleDoseReminders(med, med.reminder);
-          if (notificationIds.length > 0) {
-            updateMedication(med.id, { reminder: { ...med.reminder, notificationIds } });
-            dataChanged = true;
-          }
-        }
-        // Reset "confirmed today" tracking when the date has rolled over.
-        if (med.reminder?.enabled) {
-          const reconciled = reconcileReminderDay(med.reminder);
-          if (reconciled !== med.reminder) {
-            updateMedication(med.id, { reminder: reconciled });
-            dataChanged = true;
-          }
-        }
       }
 
-      // 3) Weekly auto-backup (Requirement II): creates HM-backup.json if
-      // missing, or refreshes it if it's more than 7 days old.
+      // 3) Safety net + day-reconciliation for the active profile's dose reminders.
+      const profileRems = getProfileReminders(activeProfileId);
+      let remsChanged = false;
+      for (const med of current) {
+        const rem = profileRems[med.id];
+        if (!rem?.enabled) continue;
+
+        // Re-schedule if notification IDs are missing (first run / cleared by OS).
+        if (!rem.notificationIds || rem.notificationIds.length === 0) {
+          const ids = await scheduleDoseReminders(med, rem);
+          if (ids.length > 0) {
+            profileRems[med.id] = { ...rem, notificationIds: ids };
+            remsChanged = true;
+          }
+        }
+
+        // Reset "confirmed today" if the calendar date has rolled over.
+        const reconciled = reconcileReminderDay(profileRems[med.id] ?? rem);
+        if (reconciled !== (profileRems[med.id] ?? rem)) {
+          profileRems[med.id] = reconciled;
+          remsChanged = true;
+        }
+      }
+      if (remsChanged) {
+        saveProfileReminders(activeProfileId, profileRems);
+        dataChanged = true;
+      }
+
+      // 4) Weekly auto-backup.
       void checkAndRunAutoBackup();
 
       if (dataChanged) refresh();
     })();
 
-    // Handle Yes/No taps on dose-reminder notifications. Routed through a
-    // ref (confirmDose is defined further down in this hook, and a plain
-    // closure here would otherwise go stale across re-renders).
+    // Handle Yes/No taps on dose-reminder notifications.
     const unsubscribe = registerDoseActionListener((medId, taken, doseTime) => {
       if (!doseTime) return;
       confirmDoseRef.current?.(medId, doseTime, taken);
     });
     return unsubscribe;
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);   // intentionally runs once on mount
+
+  // ── Profile-switch effect ──────────────────────────────────────────────────
+  // When the active profile changes: cancel the previous profile's dose
+  // notifications, schedule the new profile's, then re-merge the state.
+  const prevProfileIdRef = useRef(activeProfileId);
+  useEffect(() => {
+    const prevId = prevProfileIdRef.current;
+    if (prevId === activeProfileId) return;
+    prevProfileIdRef.current = activeProfileId;
+
+    void (async () => {
+      // Cancel old profile's dose reminders.
+      const oldRems = getProfileReminders(prevId);
+      for (const rem of Object.values(oldRems)) {
+        await cancelDoseReminders(rem);
+        await cancelSnoozeReminder(rem);
+      }
+
+      // Schedule new profile's dose reminders.
+      const base        = getMedications();
+      const newRems     = getProfileReminders(activeProfileId);
+      let remsChanged   = false;
+      for (const med of base) {
+        const rem = newRems[med.id];
+        if (!rem?.enabled) continue;
+        const ids = await scheduleDoseReminders(med, rem);
+        newRems[med.id] = { ...rem, notificationIds: ids };
+        remsChanged = true;
+      }
+      if (remsChanged) saveProfileReminders(activeProfileId, newRems);
+
+      refresh();
+    })();
+  }, [activeProfileId, refresh]);
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
 
   const add = useCallback(
     (med: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>) => {
       const settings = getSettings();
-      const { medication, merged } = addOrMergeMedication(med, settings.smartMergeEnabled);
+      const pid = profileIdRef.current;
+
+      // Strip any reminder from the shared object — reminders are profile-scoped.
+      const { reminder: incomingReminder, ...medWithoutReminder } = med;
+      const { medication, merged } = addOrMergeMedication(medWithoutReminder, settings.smartMergeEnabled);
 
       void (async () => {
-        // Re-evaluate notifications for the (new or merged) medication —
-        // a merge can change the quantity from 0 to >0, which should
-        // (re)activate alerts that may not have existed before.
-        if (merged) {
-          await cancelMedicationNotifications(medication.notificationIds);
-        }
+        if (merged) await cancelMedicationNotifications(medication.notificationIds);
         const notificationIds = await scheduleMedicationNotifications(medication, settings.notifications);
         const updates: Partial<Medication> = { notificationIds };
-
-        // If a dose reminder was configured on creation (Requirement III,
-        // "Add Medicine" page entry point), schedule it now.
-        if (medication.reminder?.enabled) {
-          const doseIds = await scheduleDoseReminders(medication, medication.reminder);
-          updates.reminder = { ...medication.reminder, notificationIds: doseIds };
-        }
-
         updateMedication(medication.id, updates);
+
+        // If a reminder was included, save it to the active profile's store.
+        if (incomingReminder?.enabled) {
+          const doseIds = await scheduleDoseReminders(medication, incomingReminder);
+          setProfileReminder(pid, medication.id, {
+            ...incomingReminder,
+            notificationIds: doseIds,
+          });
+        }
         refresh();
       })();
 
       refresh();
       return { medication, merged };
     },
-    [refresh]
+    [refresh],
   );
 
   const update = useCallback(
     (id: string, updates: Partial<Medication>) => {
-      const before = getMedications().find((m) => m.id === id);
-      const updated = updateMedication(id, updates);
+      const before  = getMedications().find((m) => m.id === id);
+      // Keep reminder changes out of the shared store.
+      const { reminder: reminderUpdate, ...sharedUpdates } = updates;
+      const updated = updateMedication(id, sharedUpdates);
 
       if (updated) {
         void (async () => {
-          // Cancel whatever was scheduled before, then reschedule from
-          // scratch based on the (possibly changed) expiration date/quantity.
           await cancelMedicationNotifications(before?.notificationIds);
-          const notificationIds = await scheduleMedicationNotifications(updated, getSettings().notifications);
+          const notificationIds = await scheduleMedicationNotifications(
+            updated,
+            getSettings().notifications,
+          );
           updateMedication(id, { notificationIds });
           refresh();
         })();
       }
 
+      // If a reminder was part of the update, persist it to the profile store.
+      if (reminderUpdate !== undefined) {
+        setProfileReminder(profileIdRef.current, id, reminderUpdate);
+      }
+
       refresh();
       return updated;
     },
-    [refresh]
+    [refresh],
   );
 
   const remove = useCallback(
     (id: string) => {
       const before = getMedications().find((m) => m.id === id);
+      const rem    = getProfileReminders(profileIdRef.current)[id];
       const result = deleteMedication(id);
       if (result) {
         void cancelMedicationNotifications(before?.notificationIds);
-        void cancelDoseReminders(before?.reminder);
+        if (rem) {
+          void cancelDoseReminders(rem);
+          void cancelSnoozeReminder(rem);
+          removeProfileReminderSvc(profileIdRef.current, id);
+        }
       }
       refresh();
       return result;
     },
-    [refresh]
+    [refresh],
   );
 
   const deleteExpired = useCallback(() => {
     const removed = deleteExpiredMedications();
     if (removed.length > 0) {
       void Promise.all(removed.map((m) => cancelMedicationNotifications(m.notificationIds)));
-      void Promise.all(removed.map((m) => cancelDoseReminders(m.reminder)));
+      void Promise.all(
+        removed.map((m) => {
+          const rem = getProfileReminders(profileIdRef.current)[m.id];
+          if (rem) {
+            removeProfileReminderSvc(profileIdRef.current, m.id);
+            return Promise.all([cancelDoseReminders(rem), cancelSnoozeReminder(rem)]);
+          }
+          return Promise.resolve();
+        }),
+      );
     }
     refresh();
     return removed.length;
@@ -200,40 +299,35 @@ export function useMedications() {
 
   const reset = useCallback(() => {
     const before = getMedications();
-    resetAllData();
+    // Cancel all expiry notifications.
     void Promise.all(before.map((m) => cancelMedicationNotifications(m.notificationIds)));
-    void Promise.all(before.map((m) => cancelDoseReminders(m.reminder)));
+    // Cancel the active profile's dose reminders.
+    const activeRems = getProfileReminders(profileIdRef.current);
+    void Promise.all(Object.values(activeRems).map((r) => cancelDoseReminders(r)));
+    // Wipe shared medication store + all profile-scoped data.
+    resetAllData();
+    clearAllProfileScopedData();
     refresh();
   }, [refresh]);
 
   const importData = useCallback(
     (data: unknown, merge: boolean = true) => {
       const previous = getMedications();
-      const result = importMedications(data, merge);
+      const result   = importMedications(data, merge);
 
       void (async () => {
         const settings = getSettings();
-
-        // Replacing the whole inventory: cancel every notification that
-        // belonged to the data we just wiped out.
         if (!merge) {
           await Promise.all(previous.map((m) => cancelMedicationNotifications(m.notificationIds)));
-          await Promise.all(previous.map((m) => cancelDoseReminders(m.reminder)));
+          const activeRems = getProfileReminders(profileIdRef.current);
+          await Promise.all(Object.values(activeRems).map((r) => cancelDoseReminders(r)));
+          saveProfileReminders(profileIdRef.current, {});
         }
 
-        // (Re)schedule notifications for the inventory as it stands now —
-        // imported medications may never have had local alerts scheduled
-        // on this device (and any notification ids they carry belong to
-        // whatever device originally exported them).
         const current = getMedications();
         for (const med of current) {
           const ids = await scheduleMedicationNotifications(med, settings.notifications);
-          const updates: Partial<Medication> = { notificationIds: ids };
-          if (med.reminder?.enabled) {
-            const doseIds = await scheduleDoseReminders(med, med.reminder);
-            updates.reminder = { ...med.reminder, notificationIds: doseIds, snoozeNotificationId: undefined };
-          }
-          updateMedication(med.id, updates);
+          updateMedication(med.id, { notificationIds: ids });
         }
         refresh();
       })();
@@ -241,10 +335,9 @@ export function useMedications() {
       refresh();
       return result;
     },
-    [refresh]
+    [refresh],
   );
 
-  /** Re-applies the given notification preferences to every medication currently in the cabinet. */
   const rescheduleAllNotifications = useCallback(
     async (prefs: NotificationPreferences) => {
       const current = getMedications();
@@ -255,57 +348,62 @@ export function useMedications() {
       }
       refresh();
     },
-    [refresh]
+    [refresh],
   );
 
-  /** Enables/updates a medication's dose reminder (Requirement I — usable from any of the 3 entry points). */
+  // ── Reminder management (profile-scoped) ───────────────────────────────────
+
   const setReminder = useCallback(
     (id: string, reminder: DoseReminder) => {
-      const before = getMedications().find((m) => m.id === id);
-      if (!before) return;
+      const med = getMedications().find((m) => m.id === id);
+      if (!med) return;
+      const pid = profileIdRef.current;
 
       void (async () => {
-        if (before.reminder) {
-          await cancelDoseReminders(before.reminder);
-          await cancelSnoozeReminder(before.reminder);
+        const existing = getProfileReminders(pid)[id];
+        if (existing) {
+          await cancelDoseReminders(existing);
+          await cancelSnoozeReminder(existing);
         }
-        const notificationIds = await scheduleDoseReminders(before, reminder);
-        updateMedication(id, { reminder: { ...reminder, notificationIds, snoozeNotificationId: undefined } });
+        const notificationIds = await scheduleDoseReminders(med, reminder);
+        setProfileReminder(pid, id, {
+          ...reminder,
+          notificationIds,
+          snoozeNotificationId: undefined,
+        });
         refresh();
       })();
     },
-    [refresh]
+    [refresh],
   );
 
-  /** Turns off and cancels a medication's dose reminder entirely. */
   const removeReminder = useCallback(
     (id: string) => {
-      const before = getMedications().find((m) => m.id === id);
-      if (!before?.reminder) return;
+      const pid      = profileIdRef.current;
+      const existing = getProfileReminders(pid)[id];
+      if (!existing) return;
 
       void (async () => {
-        await cancelDoseReminders(before.reminder);
-        await cancelSnoozeReminder(before.reminder);
-        updateMedication(id, { reminder: undefined });
+        await cancelDoseReminders(existing);
+        await cancelSnoozeReminder(existing);
+        removeProfileReminderSvc(pid, id);
         refresh();
       })();
     },
-    [refresh]
+    [refresh],
   );
 
-  /**
-   * Confirms (or declines) one specific dose. On "taken", deducts stock
-   * using the smart fraction-of-a-unit math and auto-disables the reminder
-   * if that brings quantity to 0. On "not yet", schedules a ~45 minute
-   * follow-up reminder. Used by: the notification's Yes/No buttons, and the
-   * Dashboard's "I took my medicine" button (Requirement I's safety net).
-   */
+  // ── Dose confirmation ──────────────────────────────────────────────────────
+
   const confirmDose = useCallback(
     (id: string, doseTime: string, taken: boolean) => {
-      const med = getMedications().find((m) => m.id === id);
-      if (!med?.reminder) return;
-      const reminder = reconcileReminderDay(med.reminder);
-      if (reminder.confirmedToday.includes(doseTime)) return; // already handled — avoid double-deduction
+      const pid       = profileIdRef.current;
+      const med       = getMedications().find((m) => m.id === id);
+      const baseRem   = getProfileReminders(pid)[id];
+      if (!med || !baseRem) return;
+
+      const reminder = reconcileReminderDay(baseRem);
+      if (reminder.confirmedToday.includes(doseTime)) return;
 
       void (async () => {
         await cancelSnoozeReminder(reminder);
@@ -315,18 +413,16 @@ export function useMedications() {
           const { newQuantity, newConsumedFraction } = computeDoseDeduction(reminder, med.quantity);
           const unitsDeducted = med.quantity - newQuantity;
 
-          // Write an immutable log entry — this is the only place where
-          // confirmed doses are recorded so the history is always accurate.
           addDoseLog({
-            medicationId: med.id,
+            medicationId:   med.id,
             medicationName: med.name,
             activeIngredient: med.activeIngredient,
-            dosage: med.dosage,
-            doseMg: reminder.doseMg,
+            dosage:         med.dosage,
+            doseMg:         reminder.doseMg,
             unitsDeducted,
-            quantityAfter: newQuantity,
-            scheduledTime: doseTime,
-            confirmedAt: new Date().toISOString(),
+            quantityAfter:  newQuantity,
+            scheduledTime:  doseTime,
+            confirmedAt:    new Date().toISOString(),
             source: 'reminder',
           });
 
@@ -336,163 +432,122 @@ export function useMedications() {
             confirmedToday: [...finalReminder.confirmedToday, doseTime],
           };
 
-          // Auto-disable once the medicine is fully used up, so the app
-          // stops asking about a dose that no longer exists in the cabinet.
           if (newQuantity <= 0) {
             await cancelDoseReminders(finalReminder);
             finalReminder = { ...finalReminder, enabled: false, notificationIds: [] };
           }
 
-          updateMedication(id, { quantity: newQuantity, reminder: finalReminder });
+          updateMedication(id, { quantity: newQuantity });
+          setProfileReminder(pid, id, finalReminder);
         } else {
           const snoozeId = await scheduleSnoozeReminder(med, doseTime);
-          finalReminder = { ...finalReminder, snoozeNotificationId: snoozeId };
-          updateMedication(id, { reminder: finalReminder });
+          finalReminder  = { ...finalReminder, snoozeNotificationId: snoozeId };
+          setProfileReminder(pid, id, finalReminder);
         }
 
         refresh();
       })();
     },
-    [refresh]
+    [refresh],
   );
 
-  // Keep the ref used by the notification-action listener (registered in the
-  // startup effect above) pointed at the latest confirmDose implementation.
-  useEffect(() => {
-    confirmDoseRef.current = confirmDose;
-  }, [confirmDose]);
+  useEffect(() => { confirmDoseRef.current = confirmDose; }, [confirmDose]);
 
-  /** Medications with a dose currently due (time has passed, not yet confirmed today) — for the Dashboard widget. */
+  // ── Derived data ───────────────────────────────────────────────────────────
+
   const dueReminders = medications
     .filter((m) => m.reminder?.enabled)
     .map((m) => ({ medication: m, dueTimes: getDueTimes(m.reminder!) }))
-    .filter((entry) => entry.dueTimes.length > 0);
+    .filter((e) => e.dueTimes.length > 0);
 
-  /** ALL medications that have an active reminder, regardless of whether a dose is currently due. */
   const activeReminders = medications.filter((m) => m.reminder?.enabled);
 
   const toggleEmergencyOverride = useCallback((item: string) => {
     setManuallyPresent((prev) => {
-      const next = prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item];
-      try {
-        localStorage.setItem('homemed-emergency-overrides', JSON.stringify(next));
-      } catch {}
+      const next = prev.includes(item)
+        ? prev.filter((i) => i !== item)
+        : [...prev, item];
+      try { localStorage.setItem('homemed-emergency-overrides', JSON.stringify(next)); } catch {}
       return next;
     });
   }, []);
 
   const filteredMedications = useCallback(
-    (filters: MedicationFilters, sortField: SortField = 'name', sortOrder: SortOrder = 'asc') => {
+    (
+      filters: MedicationFilters,
+      sortField: SortField = 'name',
+      sortOrder: SortOrder = 'asc',
+    ) => {
       let result = [...medications];
 
-      // Search filter
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
+        const q = filters.search.toLowerCase();
         result = result.filter(
-          (med) =>
-            med.name.toLowerCase().includes(searchLower) ||
-            med.activeIngredient.toLowerCase().includes(searchLower) ||
-            med.dosage.toLowerCase().includes(searchLower)
+          (m) =>
+            m.name.toLowerCase().includes(q) ||
+            m.activeIngredient.toLowerCase().includes(q) ||
+            m.dosage.toLowerCase().includes(q),
         );
       }
-
-      // Category filter
-      if (filters.category !== 'all') {
-        result = result.filter((med) => med.category === filters.category);
-      }
-
-      // Expiration filter
+      if (filters.category !== 'all') result = result.filter((m) => m.category === filters.category);
       if (filters.expiration !== 'all') {
-        result = result.filter((med) => {
-          const days = getDaysUntilExpiration(med.expirationDate);
-          if (filters.expiration === 'expired') return days < 0;
-          if (filters.expiration === 'expiring-soon') return days >= 0 && days <= 30;
-          if (filters.expiration === 'valid') return days > 30;
+        result = result.filter((m) => {
+          const d = getDaysUntilExpiration(m.expirationDate);
+          if (filters.expiration === 'expired')      return d < 0;
+          if (filters.expiration === 'expiring-soon') return d >= 0 && d <= 30;
+          if (filters.expiration === 'valid')         return d > 30;
           return true;
         });
       }
-
-      // Emergency filter
-      if (filters.emergencyOnly) {
-        result = result.filter((med) => med.category === 'emergency');
-      }
-
-      // Storage location filter
+      if (filters.emergencyOnly) result = result.filter((m) => m.category === 'emergency');
       if (filters.storageLocation !== 'all') {
-        result = result.filter((med) => med.storageLocation === filters.storageLocation);
+        result = result.filter((m) => m.storageLocation === filters.storageLocation);
       }
 
-      // Sorting
       result.sort((a, b) => {
-        let comparison = 0;
+        let cmp = 0;
         switch (sortField) {
-          case 'name':
-            comparison = a.name.localeCompare(b.name);
-            break;
-          case 'expirationDate':
-            comparison = new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
-            break;
-          case 'quantity':
-            comparison = a.quantity - b.quantity;
-            break;
-          case 'category':
-            comparison = a.category.localeCompare(b.category);
-            break;
-          case 'storageLocation':
-            comparison = (a.storageLocation ?? '').localeCompare(b.storageLocation ?? '');
-            break;
+          case 'name':            cmp = a.name.localeCompare(b.name); break;
+          case 'expirationDate':  cmp = new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime(); break;
+          case 'quantity':        cmp = a.quantity - b.quantity; break;
+          case 'category':        cmp = a.category.localeCompare(b.category); break;
+          case 'storageLocation': cmp = (a.storageLocation ?? '').localeCompare(b.storageLocation ?? ''); break;
         }
-        return sortOrder === 'asc' ? comparison : -comparison;
+        return sortOrder === 'asc' ? cmp : -cmp;
       });
 
       return result;
     },
-    [medications]
+    [medications],
   );
 
-  // Stats
   const stats = {
-    total: medications.length,
-    expired: medications.filter((m) => getDaysUntilExpiration(m.expirationDate) < 0).length,
-    expiringSoon: medications.filter(
-      (m) => {
-        const days = getDaysUntilExpiration(m.expirationDate);
-        return days >= 0 && days <= 30;
-      }
-    ).length,
+    total:        medications.length,
+    expired:      medications.filter((m) => getDaysUntilExpiration(m.expirationDate) < 0).length,
+    expiringSoon: medications.filter((m) => {
+      const d = getDaysUntilExpiration(m.expirationDate);
+      return d >= 0 && d <= 30;
+    }).length,
     lowStock: medications.filter((m) => m.quantity <= 5).length,
   };
 
-  // Emergency readiness
   const emergencyReadiness = (() => {
-    const medNames = medications.map((m) => m.name.toLowerCase());
-    const medIngredients = medications.map((m) => m.activeIngredient.toLowerCase());
-    
-    let found = 0;
+    const names = medications.map((m) => m.name.toLowerCase());
+    const ings  = medications.map((m) => m.activeIngredient.toLowerCase());
+    let found   = 0;
     const missing: string[] = [];
     const inMedications: string[] = [];
-    
+
     for (const item of EMERGENCY_ITEMS) {
-      const itemLower = item.toLowerCase();
-      const hasInMeds = medNames.some((name) => name.includes(itemLower)) ||
-        medIngredients.some((ing) => ing.includes(itemLower));
-      const hasManually = manuallyPresent.includes(item);
-      
-      if (hasInMeds) {
-        inMedications.push(item);
-        found++;
-      } else if (hasManually) {
-        found++;
-      } else {
-        missing.push(item);
-      }
+      const low      = item.toLowerCase();
+      const hasInMed = names.some((n) => n.includes(low)) || ings.some((i) => i.includes(low));
+      if (hasInMed)              { inMedications.push(item); found++; }
+      else if (manuallyPresent.includes(item)) { found++; }
+      else                       { missing.push(item); }
     }
-    
-    const score = Math.round((found / EMERGENCY_ITEMS.length) * 100);
-    let status = 'weak';
-    if (score >= 80) status = 'excellent';
-    else if (score >= 50) status = 'moderate';
-    
+
+    const score  = Math.round((found / EMERGENCY_ITEMS.length) * 100);
+    const status = score >= 80 ? 'excellent' : score >= 50 ? 'moderate' : 'weak';
     return { score, missing, status, total: EMERGENCY_ITEMS.length, found, inMedications, manuallyPresent };
   })();
 
