@@ -3,6 +3,7 @@ import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { I18nProvider, useI18n } from '@/i18n/I18nContext';
+import { ProfileProvider } from '@/context/ProfileContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedications } from '@/hooks/useMedications';
 import { useToast } from '@/hooks/use-toast';
@@ -281,7 +282,9 @@ function AppContent() {
 export default function App() {
   return (
     <I18nProvider>
+      <ProfileProvider>
       <AppContent />
+      </ProfileProvider>
     </I18nProvider>
   );
 }
