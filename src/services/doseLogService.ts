@@ -1,11 +1,16 @@
 import type { DoseLog } from '@/types/doseLog';
+import { getActiveProfile } from './profileService';
 
-const STORAGE_KEY = 'homemed-dose-log';
 const MAX_AGE_DAYS = 90;
+
+/** Always resolves to the current active profile's storage key. */
+function storageKey(): string {
+  return `homemed-dose-log-${getActiveProfile().id}`;
+}
 
 function loadAll(): DoseLog[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -14,7 +19,7 @@ function loadAll(): DoseLog[] {
 
 function saveAll(logs: DoseLog[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+    localStorage.setItem(storageKey(), JSON.stringify(logs));
   } catch {
     // Storage full — silently skip
   }
@@ -49,4 +54,20 @@ export function clearDoseLogs(): void {
 
 export function clearDoseLogsForMedication(medicationId: string): void {
   saveAll(loadAll().filter((l) => l.medicationId !== medicationId));
+}
+
+/**
+ * Reads dose logs for a specific profile by ID without changing the active
+ * profile — used by the backup service to include all profiles' histories.
+ */
+export function getDoseLogsForProfile(profileId: string): DoseLog[] {
+  try {
+    const raw = localStorage.getItem(`homemed-dose-log-${profileId}`);
+    const logs: DoseLog[] = raw ? JSON.parse(raw) : [];
+    return logs.sort(
+      (a, b) => new Date(b.confirmedAt).getTime() - new Date(a.confirmedAt).getTime(),
+    );
+  } catch {
+    return [];
+  }
 }

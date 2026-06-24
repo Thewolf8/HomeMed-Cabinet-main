@@ -2,23 +2,35 @@ import { Capacitor } from '@capacitor/core';
 import { getMedications } from './medicationService';
 import { writeAutoBackup, readAutoBackup, getAutoBackupModifiedTime } from './fileSystem';
 import { setLastBackupAtDirect } from '@/hooks/useSettings';
+import { getProfiles, getProfileReminders, saveProfileReminders, setActiveProfileId } from './profileService';
 import type { Medication } from '@/types/medication';
+import type { DoseReminder } from '@/types/medication';
 
 const isNative = Capacitor.isNativePlatform();
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function buildBackupContent(): string {
   const medications = getMedications();
+  const profiles    = getProfiles();
+
+  // Collect per-profile reminder maps so a full restore brings back everyone's schedules.
+  const profileReminders: Record<string, Record<string, DoseReminder>> = {};
+  for (const p of profiles) {
+    profileReminders[p.id] = getProfileReminders(p.id);
+  }
+
   return JSON.stringify(
     {
-      app: 'HomeMed Cabinet',
-      version: '1.0.2',
-      kind: 'auto-backup',
+      app:     'HomeMed Cabinet',
+      version: '1.1.0',
+      kind:    'auto-backup',
       exportDate: new Date().toISOString(),
       medications,
+      profiles,
+      profileReminders,
     },
     null,
-    2
+    2,
   );
 }
 
@@ -65,8 +77,22 @@ export async function readAutoBackupMedications(): Promise<Medication[] | null> 
   if (!content) return null;
   try {
     const parsed = JSON.parse(content);
-    if (parsed && Array.isArray(parsed.medications)) return parsed.medications;
-    return null;
+    if (!parsed || !Array.isArray(parsed.medications)) return null;
+
+    // Restore profiles if the backup includes them (v1.1.0+).
+    if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+      try { localStorage.setItem('homemed-profiles', JSON.stringify(parsed.profiles)); } catch {}
+      // Restore per-profile reminder maps.
+      if (parsed.profileReminders && typeof parsed.profileReminders === 'object') {
+        for (const [profileId, reminders] of Object.entries(parsed.profileReminders)) {
+          saveProfileReminders(profileId, reminders as Record<string, DoseReminder>);
+        }
+      }
+      // Restore the active profile pointer to the first profile in the backup.
+      setActiveProfileId(parsed.profiles[0].id);
+    }
+
+    return parsed.medications as Medication[];
   } catch {
     return null;
   }
