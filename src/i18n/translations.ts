@@ -343,6 +343,16 @@ export const translations = {
     backupWriteSuccess: 'Backup saved successfully',
     backupWriteFailed: 'Backup could not be saved',
 
+    // Profiles
+    profilesTitle: 'Family Profiles',
+    profileActive: 'active',
+    profileAdd: 'Add',
+    profileAddNew: 'Add a profile',
+    profileNamePlaceholder: 'Name (e.g. Mom, Dad...)',
+    profileColorLabel: 'Pick a color',
+    profileDeleteConfirm: 'Delete this profile? Their reminders and dose history will be permanently removed.',
+    profileMaxReached: 'Maximum 6 profiles reached.',
+
     // Misc additions
     expiresToday: 'Expires today',
     units: 'units',
@@ -701,6 +711,16 @@ export const translations = {
     backupWriteSuccess: 'تم حفظ النسخة الاحتياطية',
     backupWriteFailed: 'تعذر حفظ النسخة الاحتياطية',
 
+    // Profiles
+    profilesTitle: 'ملفات العائلة',
+    profileActive: 'نشط',
+    profileAdd: 'إضافة',
+    profileAddNew: 'إضافة ملف شخصي',
+    profileNamePlaceholder: 'الاسم (مثل: أبي، أمي...)',
+    profileColorLabel: 'اختر لوناً',
+    profileDeleteConfirm: 'حذف هذا الملف؟ سيتم حذف تذكيراته وسجل جرعاته نهائياً.',
+    profileMaxReached: 'الحد الأقصى 6 ملفات شخصية.',
+
     // Misc additions
     expiresToday: 'تنتهي اليوم',
     units: 'وحدة',
@@ -1058,6 +1078,16 @@ export const translations = {
     backupRestoreSuccess: 'Données restaurées depuis la sauvegarde automatique',
     backupWriteSuccess: 'Sauvegarde enregistrée avec succès',
     backupWriteFailed: 'Impossible d\'enregistrer la sauvegarde',
+
+    // Profiles
+    profilesTitle: 'Profils familiaux',
+    profileActive: 'actif',
+    profileAdd: 'Ajouter',
+    profileAddNew: 'Ajouter un profil',
+    profileNamePlaceholder: 'Nom (ex. Papa, Maman...)',
+    profileColorLabel: 'Choisir une couleur',
+    profileDeleteConfirm: 'Supprimer ce profil ? Ses rappels et son historique de doses seront définitivement effacés.',
+    profileMaxReached: 'Maximum 6 profils atteint.',
 
     // Misc additions
     expiresToday: 'Expire aujourd\'hui',
