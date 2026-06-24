@@ -3,14 +3,12 @@ import { motion } from 'framer-motion';
 import {
   ClipboardList,
   CheckCircle2,
-  Pill,
   Clock,
   Trash2,
   ChevronDown,
   ChevronUp,
-  BarChart3,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -23,7 +21,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nContext';
+import { useProfile } from '@/context/ProfileContext';
 import { getDoseLogs, clearDoseLogs } from '@/services/doseLogService';
+import { PROFILE_COLOR_CLASSES } from '@/types/profile';
 import type { DoseLog } from '@/types/doseLog';
 
 // ── Date helpers ───────────────────────────────────────────────────────────
@@ -80,13 +80,17 @@ function computeStats(logs: DoseLog[]) {
 
 export default function HistoryPage() {
   const { t } = useI18n();
+  const { activeProfile } = useProfile();
+  const cls = PROFILE_COLOR_CLASSES;
+
   const [logs, setLogs] = useState<DoseLog[]>([]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const reload = useCallback(() => setLogs(getDoseLogs()), []);
 
-  useEffect(() => { reload(); }, [reload]);
+  // Reload when the active profile changes so history reflects the right person.
+  useEffect(() => { reload(); }, [reload, activeProfile.id]);
 
   // Group logs by date key
   const groups: { key: string; label: string; entries: DoseLog[] }[] = [];
@@ -134,7 +138,10 @@ export default function HistoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('historyTitle')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t('historySubtitle')}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${cls[activeProfile.color].bg}`} />
+            <p className="text-sm text-muted-foreground">{activeProfile.name}</p>
+          </div>
         </div>
         {logs.length > 0 && (
           <Button
