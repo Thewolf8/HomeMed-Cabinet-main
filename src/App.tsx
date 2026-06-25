@@ -24,6 +24,7 @@ import ImportConflictModal from '@/components/ImportConflictModal';
 import './App.css';
 
 import HistoryPage from '@/pages/HistoryPage';
+import Onboarding, { ONBOARDED_KEY } from '@/components/Onboarding';
 
 export type Page = 'dashboard' | 'medicines' | 'add' | 'export' | 'settings' | 'edit' | 'history';
 
@@ -279,11 +280,41 @@ function AppContent() {
   );
 }
 
+
+// ── Root — decides whether to show onboarding or the main app ─────────────────
+function RootContent() {
+  const [onboarded, setOnboarded] = useState<boolean>(() => {
+    // Already completed onboarding
+    if (localStorage.getItem(ONBOARDED_KEY) === 'true') return true;
+
+    // Grace path: existing user who had medication data before this feature
+    // shipped — mark them as already onboarded so they don't see the flow.
+    try {
+      const raw = localStorage.getItem('homemed-medications');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length > 0) {
+          localStorage.setItem(ONBOARDED_KEY, 'true');
+          return true;
+        }
+      }
+    } catch {}
+
+    return false;
+  });
+
+  if (!onboarded) {
+    return <Onboarding onComplete={() => setOnboarded(true)} />;
+  }
+
+  return <AppContent />;
+}
+
 export default function App() {
   return (
     <I18nProvider>
       <ProfileProvider>
-      <AppContent />
+        <RootContent />
       </ProfileProvider>
     </I18nProvider>
   );
