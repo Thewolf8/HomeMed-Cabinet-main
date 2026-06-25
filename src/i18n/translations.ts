@@ -353,7 +353,25 @@ export const translations = {
     profileDeleteConfirm: 'Delete this profile? Their reminders and dose history will be permanently removed.',
     profileMaxReached: 'Maximum 6 profiles reached.',
 
-    // Misc additions
+    // Onboarding
+    onboardingSkip: 'Skip',
+    onboardingNext: 'Next',
+    onboardingGetStarted: 'Get Started',
+    onboardingBack: 'Back',
+    onboardingSlide1Title: 'Your family\'s medicine cabinet, in one place',
+    onboardingSlide1Body: 'Track medicines, expiry dates, and stock levels — all saved privately on your device.',
+    onboardingSlide2Title: 'One cabinet, every schedule',
+    onboardingSlide2Body: 'Everyone shares the same medicine inventory. But each person has their own reminders and dose history. Switch profiles anytime to see your view.',
+    onboardingSlide3Title: 'Reminders that count',
+    onboardingSlide3Body: 'Set a daily reminder for any medicine. When you confirm a dose, the quantity deducts from stock automatically — no manual tracking needed.',
+    onboardingSlide4Title: '100% private, 100% offline',
+    onboardingSlide4Body: 'Your medical data never leaves this device. No accounts, no cloud, no analytics — just you and your family\'s health, safe and private.',
+    onboardingNameTitle: 'Who\'s using this device first?',
+    onboardingNameBody: 'This becomes your profile. You can add other family members later from the switcher at the top.',
+    onboardingNameLabel: 'Your name',
+    onboardingNamePlaceholder: 'e.g. Mom, Dad, Ahmed…',
+
+        // Misc additions
     expiresToday: 'Expires today',
     units: 'units',
     all: 'All',
@@ -721,7 +739,25 @@ export const translations = {
     profileDeleteConfirm: 'حذف هذا الملف؟ سيتم حذف تذكيراته وسجل جرعاته نهائياً.',
     profileMaxReached: 'الحد الأقصى 6 ملفات شخصية.',
 
-    // Misc additions
+    // Onboarding
+    onboardingSkip: 'تخطي',
+    onboardingNext: 'التالي',
+    onboardingGetStarted: 'ابدأ الآن',
+    onboardingBack: 'رجوع',
+    onboardingSlide1Title: 'خزانة أدوية عائلتك، في مكان واحد',
+    onboardingSlide1Body: 'تتبع الأدوية وتواريخ الانتهاء والكميات — كل شيء محفوظ بشكل خاص على جهازك.',
+    onboardingSlide2Title: 'خزانة واحدة، جداول مختلفة',
+    onboardingSlide2Body: 'يشترك الجميع في نفس مخزون الأدوية، لكن لكل شخص تذكيراته وسجل جرعاته الخاص. بدّل بين الملفات الشخصية في أي وقت لترى عرضك الخاص.',
+    onboardingSlide3Title: 'تذكيرات تحسب الكميات',
+    onboardingSlide3Body: 'اضبط تذكيراً يومياً لأي دواء. عند تأكيد أخذ الجرعة، تُطرح الكمية تلقائياً من المخزون — دون أي تتبع يدوي.',
+    onboardingSlide4Title: '100٪ خصوصية، 100٪ بدون إنترنت',
+    onboardingSlide4Body: 'بياناتك الطبية لا تغادر هذا الجهاز أبداً. لا حسابات، لا سحابة، لا تحليلات — فقط أنت وصحة عائلتك، آمنة وخاصة.',
+    onboardingNameTitle: 'من يستخدم هذا الجهاز أولاً؟',
+    onboardingNameBody: 'سيصبح هذا ملفك الشخصي. يمكنك إضافة أفراد العائلة الآخرين لاحقاً من محدد الملفات في الأعلى.',
+    onboardingNameLabel: 'اسمك',
+    onboardingNamePlaceholder: 'مثال: أبي، أمي، أحمد...',
+
+        // Misc additions
     expiresToday: 'تنتهي اليوم',
     units: 'وحدة',
     all: 'الكل',
@@ -1089,7 +1125,25 @@ export const translations = {
     profileDeleteConfirm: 'Supprimer ce profil ? Ses rappels et son historique de doses seront définitivement effacés.',
     profileMaxReached: 'Maximum 6 profils atteint.',
 
-    // Misc additions
+    // Onboarding
+    onboardingSkip: 'Passer',
+    onboardingNext: 'Suivant',
+    onboardingGetStarted: 'Commencer',
+    onboardingBack: 'Retour',
+    onboardingSlide1Title: 'L\'armoire à médicaments de votre famille, en un seul endroit',
+    onboardingSlide1Body: 'Suivez les médicaments, dates de péremption et stocks — tout est enregistré en privé sur votre appareil.',
+    onboardingSlide2Title: 'Une armoire, chaque emploi du temps',
+    onboardingSlide2Body: 'Tout le monde partage le même inventaire de médicaments. Mais chacun a ses propres rappels et historique de doses. Changez de profil à tout moment pour voir votre vue.',
+    onboardingSlide3Title: 'Des rappels qui comptent',
+    onboardingSlide3Body: 'Configurez un rappel quotidien pour n\'importe quel médicament. Quand vous confirmez une dose, la quantité se déduit automatiquement du stock — aucun suivi manuel requis.',
+    onboardingSlide4Title: '100 % privé, 100 % hors ligne',
+    onboardingSlide4Body: 'Vos données médicales ne quittent jamais cet appareil. Pas de comptes, pas de cloud, pas d\'analyses — juste vous et la santé de votre famille, en sécurité.',
+    onboardingNameTitle: 'Qui utilise cet appareil en premier ?',
+    onboardingNameBody: 'Cela deviendra votre profil. Vous pourrez ajouter d\'autres membres de la famille plus tard via le sélecteur en haut.',
+    onboardingNameLabel: 'Votre nom',
+    onboardingNamePlaceholder: 'ex. Papa, Maman, Yasmine…',
+
+        // Misc additions
     expiresToday: 'Expire aujourd\'hui',
     units: 'unités',
     all: 'Tout',
