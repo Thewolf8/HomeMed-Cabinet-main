@@ -100,6 +100,14 @@
 -keep class com.capacitorjs.plugins.camera.** { *; }
 -keep class com.capacitorjs.plugins.barcodescanner.** { *; }
 
+# ML Kit Text Recognition (Smart Camera Scan / OCR feature)
+# The text-recognition models are loaded by class name at runtime.
+-keep class com.google.android.gms.vision.** { *; }
+-keep class com.google.mlkit.vision.text.** { *; }
+-keep class com.google.mlkit.vision.common.** { *; }
+-keep class io.capawesome.capacitorjs.plugins.mlkit.textrecognition.** { *; }
+-dontwarn com.google.mlkit.**
+
 
 # -----------------------------------------------------------------------------
 # 7. JSON / localStorage data-model protection
