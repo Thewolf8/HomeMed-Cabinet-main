@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pill, ImagePlus, X, ScanLine, Info, Loader2, CheckCircle2, Bell, MapPin } from 'lucide-react';
+import { Pill, ImagePlus, X, ScanLine, Info, Loader2, CheckCircle2, Bell, MapPin, Camera } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,13 @@ import {
   BarcodePermissionDeniedError,
 } from '@/services/barcodeService';
 import DoseReminderEditor, { emptyReminderDraft } from '@/components/DoseReminderEditor';
+import {
+  openCameraCapture,
+  scanBoxAndParse,
+  mapOcrFormToMedicineForm,
+  OcrNotSupportedError,
+  OcrNoTextError,
+} from '@/services/ocrScanService';
 import { draftToReminder } from '@/services/doseReminderService';
 
 interface AddMedicinePageProps {
@@ -68,6 +75,12 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
   const [reminderDraft, setReminderDraft] = useState(emptyReminderDraft());
+  const [ocrScanning, setOcrScanning]       = useState(false);
+  const [ocrFilledFields, setOcrFilledFields] = useState<Set<string>>(new Set());
+
+  /** Returns Tailwind classes that highlight a field auto-filled by OCR. */
+  const ocrCls = (field: string) =>
+    ocrFilledFields.has(field) ? 'ring-2 ring-emerald-500/40 border-emerald-500/50' : '';
 
   // Convert stored YYYY-MM-DD ↔ YYYY-MM for month input
   const dateInputValue = isMonthYear && form.expirationDate
@@ -76,6 +89,32 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
 
   const handleDateChange = (val: string) => {
     update('expirationDate', isMonthYear && val ? val + '-01' : val);
+  };
+
+  // ── Smart camera OCR scan ────────────────────────────────────────────────────
+  const handleScanBox = async () => {
+    setOcrScanning(true);
+    try {
+      const file    = await openCameraCapture();
+      const result  = await scanBoxAndParse(file);
+      const filled  = new Set<string>();
+
+      if (result.medicine_name)    { update('name',             result.medicine_name);    filled.add('name'); }
+      if (result.active_ingredient){ update('activeIngredient', result.active_ingredient); filled.add('activeIngredient'); }
+      if (result.dosage_strength)  { update('dosage',           result.dosage_strength);  filled.add('dosage'); }
+      const mappedForm = mapOcrFormToMedicineForm(result.form);
+      if (mappedForm)              { update('form',             mappedForm);              filled.add('form'); }
+      if (result.additional_info)  { update('notes',            result.additional_info);  filled.add('notes'); }
+
+      setOcrFilledFields(filled);
+      toast(filled.size > 0 ? t('scanBoxSuccess') : t('scanBoxNoText'));
+    } catch (err) {
+      if (err instanceof OcrNotSupportedError)  toast(t('scanBoxNotSupported'));
+      else if (err instanceof OcrNoTextError)   toast(t('scanBoxNoText'));
+      else                                       toast(t('scanBoxError'));
+    } finally {
+      setOcrScanning(false);
+    }
   };
 
   const handleScanBarcode = async () => {
@@ -147,6 +186,11 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
 
   const update = (field: keyof typeof form, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    // Clear OCR highlight when the user manually edits a previously auto-filled field
+    setOcrFilledFields((prev) => {
+      if (!prev.has(field as string)) return prev;
+      const next = new Set(prev); next.delete(field as string); return next;
+    });
     if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -180,6 +224,38 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ── Smart Camera Scan ──────────────────────────────────────── */}
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Camera className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">{t('scanBoxTitle')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{t('scanBoxDesc')}</p>
+                </div>
+              </div>
+              {ocrFilledFields.size > 0 && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  {t('scanBoxSuccess')}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={handleScanBox}
+                disabled={ocrScanning || scanning}
+              >
+                {ocrScanning
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />{t('scanBoxScanning')}</>
+                  : <><Camera className="w-4 h-4" />{ocrFilledFields.size > 0 ? t('scanBoxScanAgain') : t('scanBoxButton')}</>
+                }
+              </Button>
+            </div>
+
             {/* Name */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
@@ -216,7 +292,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
                 placeholder={t('medicineName')}
-                className={errors.name ? 'border-destructive' : ''}
+                className={[errors.name ? 'border-destructive' : '', ocrCls('name')].filter(Boolean).join(' ')}
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
@@ -244,6 +320,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                   value={form.activeIngredient}
                   onChange={(e) => update('activeIngredient', e.target.value)}
                   placeholder={t('activeIngredient')}
+                  className={ocrCls('activeIngredient')}
                 />
               </div>
 
@@ -257,7 +334,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                   value={form.dosage}
                   onChange={(e) => update('dosage', e.target.value)}
                   placeholder={t('dosageExample')}
-                  className={errors.dosage ? 'border-destructive' : ''}
+                  className={[errors.dosage ? 'border-destructive' : '', ocrCls('dosage')].filter(Boolean).join(' ')}
                 />
                 {errors.dosage && <p className="text-xs text-destructive">{errors.dosage}</p>}
               </div>
@@ -389,6 +466,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder={t('notes')}
                 rows={2}
+                className={ocrCls('notes')}
               />
             </div>
 
