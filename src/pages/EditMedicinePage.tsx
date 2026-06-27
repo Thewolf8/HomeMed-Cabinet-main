@@ -35,7 +35,6 @@ import {
 } from '@/services/barcodeService';
 import DoseReminderEditor from '@/components/DoseReminderEditor';
 import {
-  openCameraCapture,
   scanBoxAndParse,
   mapOcrFormToMedicineForm,
   OcrNotSupportedError,
@@ -79,8 +78,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
     if (!form) return;
     setOcrScanning(true);
     try {
-      const file    = await openCameraCapture();
-      const result  = await scanBoxAndParse(file);
+      const result  = await scanBoxAndParse();
       const filled  = new Set<string>();
 
       if (result.medicine_name)     { update('name',             result.medicine_name);    filled.add('name'); }
