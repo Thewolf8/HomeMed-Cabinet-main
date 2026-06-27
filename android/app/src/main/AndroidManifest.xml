@@ -52,7 +52,7 @@
         -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode_ui" />
+            android:value="barcode_ui,text_detector" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -63,6 +63,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- TextScanActivity — native live-camera viewfinder for Smart Camera Scan -->
+        <activity
+            android:name=".TextScanActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:exported="false" />
+
     </application>
 
     <!-- Permissions -->
