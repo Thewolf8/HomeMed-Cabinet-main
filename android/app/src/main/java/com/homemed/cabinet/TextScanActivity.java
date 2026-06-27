@@ -5,10 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.TypedValue;
@@ -39,31 +36,25 @@ import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 /**
- * TextScanActivity — native full-screen camera scanner for the Smart Camera Scan feature.
+ * TextScanActivity  —  live CameraX viewfinder + ML Kit Text Recognition.
  *
- * UX flow (mirrors the barcode scanner experience):
- *   1. Opens instantly with a live CameraX preview.
- *   2. A white guide rectangle shows the user where to frame the medicine box.
- *   3. The user taps "مسح / Scan" to capture the current preview frame.
- *   4. ML Kit Text Recognition runs on-device (<200 ms for a sharp image).
- *   5. On success → returns recognised text via Activity result → JS receives it.
- *   6. On failure / no text → shows feedback and lets the user retry.
- *
- * No internet used at any step — ML Kit Text Recognition (bundled model) is fully offline.
+ * Deliberately simple: no inner-class drawers, no complex decoration.
+ * Every external call is wrapped in try/catch so a missing dep or CameraX
+ * hiccup produces a graceful cancellation rather than a process crash.
  */
 public class TextScanActivity extends AppCompatActivity {
 
     public static final String RESULT_TEXT = "recognized_text";
-    private static final int REQ_CAMERA    = 101;
+    private static final int REQ_CAMERA = 101;
 
-    private PreviewView      previewView;
-    private ProgressBar      progressBar;
-    private TextView         statusText;
-    private Button           scanButton;
+    private PreviewView previewView;
+    private TextView    statusText;
+    private Button      scanButton;
+    private ProgressBar progressBar;
+
+    private ListenableFuture<ProcessCameraProvider> cameraFuture;
     private ProcessCameraProvider cameraProvider;
-
-    private final TextRecognizer recognizer =
-        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+    private TextRecognizer        recognizer;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -71,78 +62,85 @@ public class TextScanActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        // Initialise ML Kit recogniser — if the library is missing this throws
+        // immediately and we cancel cleanly instead of crashing the whole process.
+        try {
+            recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        } catch (Exception e) {
+            setResult(Activity.RESULT_CANCELED);
+            finish();
+            return;
+        }
+
         buildUI();
-        checkPermissionThenStart();
+        checkCameraPermission();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (cameraProvider != null) cameraProvider.unbindAll();
-        recognizer.close();
+        try { if (cameraProvider != null) cameraProvider.unbindAll(); }
+        catch (Exception ignored) {}
+        try { if (recognizer != null) recognizer.close(); }
+        catch (Exception ignored) {}
     }
 
-    // ── UI (fully programmatic — no XML layout file needed) ───────────────────
+    // ── UI (all programmatic — no XML layout needed) ──────────────────────────
 
     private void buildUI() {
-        final int dp = Math.round(getResources().getDisplayMetrics().density);
+        final float density = getResources().getDisplayMetrics().density;
+        final int dp = Math.round(density);
 
+        // Root
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
-        // ── Live preview ────────────────────────────────────────────────────
+        // ── Live preview ──────────────────────────────────────────────────────
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
         root.addView(previewView, matchParent());
 
-        // ── Dark vignette overlay with cut-out guide box ─────────────────────
-        View vignette = new VignetteView(this);
-        root.addView(vignette, matchParent());
-
-        // ── Guide box border (white rounded rectangle) ───────────────────────
-        int boxW = 300 * dp, boxH = 180 * dp;
+        // ── Guide rectangle — white stroked border ────────────────────────────
         View guide = new View(this);
         GradientDrawable border = new GradientDrawable();
         border.setShape(GradientDrawable.RECTANGLE);
         border.setColor(Color.TRANSPARENT);
-        border.setStroke(3 * dp, Color.WHITE);
-        border.setCornerRadius(10 * dp);
+        border.setStroke(2 * dp, 0xDDFFFFFF);
+        border.setCornerRadius(8 * dp);
         guide.setBackground(border);
-        FrameLayout.LayoutParams guideLP = new FrameLayout.LayoutParams(boxW, boxH);
-        guideLP.gravity = Gravity.CENTER;
-        guideLP.bottomMargin = 110 * dp;   // sit above the button bar
+        FrameLayout.LayoutParams guideLP =
+            new FrameLayout.LayoutParams(300 * dp, 175 * dp);
+        guideLP.gravity     = Gravity.CENTER;
+        guideLP.bottomMargin = 96 * dp;      // sits above the button bar
         root.addView(guide, guideLP);
 
-        // ── Corner accent marks on the guide box ─────────────────────────────
-        addCorner(root, boxW, boxH, true,  true,  dp);
-        addCorner(root, boxW, boxH, true,  false, dp);
-        addCorner(root, boxW, boxH, false, true,  dp);
-        addCorner(root, boxW, boxH, false, false, dp);
-
-        // ── Status text ──────────────────────────────────────────────────────
+        // ── Instruction label ─────────────────────────────────────────────────
         statusText = new TextView(this);
         statusText.setText("وجّه الكاميرا نحو علبة الدواء");
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         statusText.setGravity(Gravity.CENTER);
-        statusText.setPadding(16 * dp, 8 * dp, 16 * dp, 8 * dp);
-        statusText.setBackgroundColor(0xBB000000);
-        GradientDrawable statusBg = new GradientDrawable();
-        statusBg.setShape(GradientDrawable.RECTANGLE);
-        statusBg.setColor(0xBB000000);
-        statusBg.setCornerRadius(20 * dp);
-        statusText.setBackground(statusBg);
-        FrameLayout.LayoutParams statusLP = new FrameLayout.LayoutParams(
+        statusText.setPadding(18 * dp, 7 * dp, 18 * dp, 7 * dp);
+
+        GradientDrawable labelBg = new GradientDrawable();
+        labelBg.setShape(GradientDrawable.RECTANGLE);
+        labelBg.setColor(0xAA000000);
+        labelBg.setCornerRadius(20 * dp);
+        statusText.setBackground(labelBg);
+
+        FrameLayout.LayoutParams labelLP = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT);
-        statusLP.gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
-        statusLP.bottomMargin = 195 * dp;
-        root.addView(statusText, statusLP);
+        labelLP.gravity      = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+        labelLP.bottomMargin = 178 * dp;
+        root.addView(statusText, labelLP);
 
-        // ── Loading spinner (hidden until scan) ──────────────────────────────
+        // ── Spinner (hidden until scan is in progress) ────────────────────────
         progressBar = new ProgressBar(this);
         progressBar.setVisibility(View.GONE);
-        FrameLayout.LayoutParams pbLP = new FrameLayout.LayoutParams(64 * dp, 64 * dp);
+        FrameLayout.LayoutParams pbLP =
+            new FrameLayout.LayoutParams(56 * dp, 56 * dp);
         pbLP.gravity = Gravity.CENTER;
         root.addView(progressBar, pbLP);
 
@@ -151,7 +149,7 @@ public class TextScanActivity extends AppCompatActivity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(24 * dp, 16 * dp, 24 * dp, 36 * dp);
-        bar.setBackgroundColor(0xEE000000);
+        bar.setBackgroundColor(0xF0111111);
 
         // Cancel
         Button cancelBtn = new Button(this);
@@ -164,23 +162,26 @@ public class TextScanActivity extends AppCompatActivity {
             finish();
         });
         bar.addView(cancelBtn,
-            new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        // Scan (primary action)
+        // Scan (primary)
         scanButton = new Button(this);
-        scanButton.setText("مسح");
+        scanButton.setText("مسح النص");
         scanButton.setTextColor(Color.WHITE);
-        scanButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        scanButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         GradientDrawable scanBg = new GradientDrawable();
         scanBg.setShape(GradientDrawable.RECTANGLE);
-        scanBg.setColor(0xFF2563EB);          // matches app primary (blue-600)
+        scanBg.setColor(0xFF2563EB);          // blue-600  — matches app primary
         scanBg.setCornerRadius(24 * dp);
         scanButton.setBackground(scanBg);
-        scanButton.setPadding(40 * dp, 0, 40 * dp, 0);
+        scanButton.setPadding(32 * dp, 4 * dp, 32 * dp, 4 * dp);
         scanButton.setOnClickListener(v -> captureAndRecognize());
+
         LinearLayout.LayoutParams scanLP =
-            new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f);
-        scanLP.setMarginStart(16 * dp);
+            new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f);
+        scanLP.setMarginStart(12 * dp);
         bar.addView(scanButton, scanLP);
 
         FrameLayout.LayoutParams barLP = new FrameLayout.LayoutParams(
@@ -192,68 +193,22 @@ public class TextScanActivity extends AppCompatActivity {
         setContentView(root);
     }
 
-    /** Small L-shaped corner accent drawn on top of the guide box border. */
-    private void addCorner(FrameLayout root, int boxW, int boxH,
-                           boolean top, boolean left, int dp) {
-        int len = 20 * dp, thick = 3 * dp;
-        // Horizontal stroke
-        View h = new View(this);
-        h.setBackgroundColor(0xFF60A5FA);   // blue-400 accent
-        FrameLayout.LayoutParams hLP = new FrameLayout.LayoutParams(len, thick);
-        hLP.gravity = Gravity.CENTER;
-        hLP.bottomMargin = (top  ? -boxH / 2 : boxH / 2 - thick) + 110 * dp;
-        hLP.leftMargin   = left  ?  -boxW / 2 : boxW / 2 - len;
-        // setMarginEnd isn't reliable here; leftMargin offset from centre works
-        root.addView(h, hLP);
-
-        // Vertical stroke
-        View v = new View(this);
-        v.setBackgroundColor(0xFF60A5FA);
-        FrameLayout.LayoutParams vLP = new FrameLayout.LayoutParams(thick, len);
-        vLP.gravity = Gravity.CENTER;
-        vLP.bottomMargin = (top  ? -boxH / 2 : boxH / 2 - len) + 110 * dp;
-        vLP.leftMargin   = left  ? -boxW / 2 : boxW / 2 - thick;
-        root.addView(v, vLP);
-    }
-
     private static FrameLayout.LayoutParams matchParent() {
         return new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT);
     }
 
-    // ── Camera permission & start ─────────────────────────────────────────────
+    // ── Camera permission ─────────────────────────────────────────────────────
 
-    private void checkPermissionThenStart() {
+    private void checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
             startCamera();
         } else {
-            ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+            ActivityCompat.requestPermissions(
+                this, new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
         }
-    }
-
-    private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> future =
-            ProcessCameraProvider.getInstance(this);
-
-        future.addListener(() -> {
-            try {
-                cameraProvider = future.get();
-                Preview preview = new Preview.Builder().build();
-                preview.setSurfaceProvider(previewView.getSurfaceProvider());
-                cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(
-                    this, CameraSelector.DEFAULT_BACK_CAMERA, preview);
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Camera error.", Toast.LENGTH_SHORT).show();
-                    setResult(Activity.RESULT_CANCELED);
-                    finish();
-                });
-            }
-        }, ContextCompat.getMainExecutor(this));
     }
 
     @Override
@@ -261,21 +216,62 @@ public class TextScanActivity extends AppCompatActivity {
                                            @NonNull String[] perms,
                                            @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
-        if (code == REQ_CAMERA && results.length > 0
-                && results[0] == PackageManager.PERMISSION_GRANTED) {
-            startCamera();
-        } else {
+        if (code == REQ_CAMERA) {
+            if (results.length > 0
+                    && results[0] == PackageManager.PERMISSION_GRANTED) {
+                startCamera();
+            } else {
+                setResult(Activity.RESULT_CANCELED);
+                finish();
+            }
+        }
+    }
+
+    // ── CameraX ───────────────────────────────────────────────────────────────
+
+    private void startCamera() {
+        try {
+            cameraFuture = ProcessCameraProvider.getInstance(this);
+            cameraFuture.addListener(() -> {
+                try {
+                    cameraProvider = cameraFuture.get();
+
+                    Preview preview = new Preview.Builder().build();
+                    preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
+                    cameraProvider.unbindAll();
+                    cameraProvider.bindToLifecycle(
+                        TextScanActivity.this,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview);
+
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(TextScanActivity.this,
+                            "تعذّر تشغيل الكاميرا.", Toast.LENGTH_SHORT).show();
+                        setResult(Activity.RESULT_CANCELED);
+                        finish();
+                    });
+                }
+            }, ContextCompat.getMainExecutor(this));
+
+        } catch (Exception e) {
+            Toast.makeText(this,
+                "تعذّر تشغيل الكاميرا.", Toast.LENGTH_SHORT).show();
             setResult(Activity.RESULT_CANCELED);
             finish();
         }
     }
 
-    // ── OCR capture ──────────────────────────────────────────────────────────
+    // ── OCR ──────────────────────────────────────────────────────────────────
 
     private void captureAndRecognize() {
-        Bitmap frame = previewView.getBitmap();
+        Bitmap frame = null;
+        try { frame = previewView.getBitmap(); } catch (Exception ignored) {}
+
         if (frame == null) {
-            Toast.makeText(this, "الكاميرا غير جاهزة. حاول مجدداً.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,
+                "الكاميرا غير جاهزة — انتظر لحظة.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -283,17 +279,26 @@ public class TextScanActivity extends AppCompatActivity {
         progressBar.setVisibility(View.VISIBLE);
         statusText.setText("جاري القراءة…");
 
-        InputImage image = InputImage.fromBitmap(frame, 0);
-        recognizer.process(image)
-            .addOnSuccessListener(this::onRecognized)
-            .addOnFailureListener(e -> resetToReady());
+        final Bitmap captured = frame;
+        try {
+            InputImage image = InputImage.fromBitmap(captured, 0);
+            recognizer.process(image)
+                .addOnSuccessListener(this::onTextRecognized)
+                .addOnFailureListener(e -> {
+                    resetToReady();
+                    Toast.makeText(this, "فشلت القراءة — حاول مجدداً.",
+                        Toast.LENGTH_SHORT).show();
+                });
+        } catch (Exception e) {
+            resetToReady();
+        }
     }
 
-    private void onRecognized(Text visionText) {
+    private void onTextRecognized(Text visionText) {
         String text = visionText.getText().trim();
         if (text.isEmpty()) {
             resetToReady();
-            statusText.setText("لا نص واضح — حسّن الإضاءة وحاول مجدداً");
+            statusText.setText("لا نص — حسّن الإضاءة وكرّر المحاولة.");
             return;
         }
         Intent data = new Intent();
@@ -306,31 +311,5 @@ public class TextScanActivity extends AppCompatActivity {
         progressBar.setVisibility(View.GONE);
         scanButton.setEnabled(true);
         statusText.setText("وجّه الكاميرا نحو علبة الدواء");
-    }
-
-    // ── Vignette overlay — dims corners leaving centre bright ─────────────────
-
-    private static class VignetteView extends View {
-        VignetteView(android.content.Context ctx) { super(ctx); }
-
-        @Override
-        protected void onDraw(@NonNull Canvas canvas) {
-            super.onDraw(canvas);
-            int w = getWidth(), h = getHeight();
-            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setColor(0x66000000);
-
-            int dp = Math.round(getResources().getDisplayMetrics().density);
-            int boxW = 300 * dp, boxH = 180 * dp;
-            int cx = w / 2, cy = h / 2 - 55 * dp;  // same offset as guide box
-
-            // Four dark rectangles surrounding the guide box
-            canvas.drawRect(0, 0, w, cy - boxH / 2, p);             // top
-            canvas.drawRect(0, cy + boxH / 2, w, h, p);             // bottom
-            canvas.drawRect(0, cy - boxH / 2, cx - boxW / 2,
-                            cy + boxH / 2, p);                        // left
-            canvas.drawRect(cx + boxW / 2, cy - boxH / 2,
-                            w, cy + boxH / 2, p);                     // right
-        }
     }
 }
