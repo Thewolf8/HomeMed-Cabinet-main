@@ -166,3 +166,17 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# ── CameraX — Smart Camera Scan (TextScanActivity) ───────────────────────────
+# CameraX resolves camera implementations and surface providers by class name.
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+
+# ML Kit Text Recognition (bundled model, fully offline)
+-keep class com.google.mlkit.vision.text.** { *; }
+-keep class com.google.mlkit.vision.common.** { *; }
+-dontwarn com.google.mlkit.**
+
+# Guava ListenableFuture — used by CameraX internally
+-keep class com.google.common.util.concurrent.** { *; }
+-dontwarn com.google.common.**
