@@ -3,7 +3,9 @@ package com.homemed.cabinet;
 import android.app.Activity;
 import android.content.Intent;
 
-import com.getcapacitor.ActivityResult;
+// تم تصحيح المسار هنا للاعتماد على مكتبة أندرويد الرسمية بدلاً من كاباسيتور
+import androidx.activity.result.ActivityResult; 
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -15,8 +17,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * TextScanPlugin — Capacitor bridge for the Smart Camera Scan feature.
  *
  * Exposed to JavaScript via:
- *   const TextScan = registerPlugin('TextScan');
- *   const { text } = await TextScan.scan();
+ * const TextScan = registerPlugin('TextScan');
+ * const { text } = await TextScan.scan();
  *
  * The plugin launches TextScanActivity (a full-screen native camera viewfinder)
  * and returns the recognised text via an Activity result, exactly the same
