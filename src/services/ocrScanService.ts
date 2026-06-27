@@ -1,23 +1,35 @@
 /**
  * ocrScanService.ts  —  Smart Camera Scan  (100% offline)
  *
- * Pipeline — no internet required at any step:
- *   1. Capture image via <input capture="environment"> in the Capacitor WebView
- *   2. Save to Directory.Cache via @capacitor/filesystem (already in project)
- *   3. Run ML Kit Text Recognition on-device via @jcesarmobile/capacitor-ocr
- *   4. Parse the raw OCR text with structured regex heuristics (no LLM needed)
- *   5. Return OcrScanResult — pages apply it to form fields with green highlights
+ * Uses a custom Capacitor plugin (TextScanPlugin.java + TextScanActivity.java)
+ * that opens a native full-screen camera viewfinder — identical UX to the
+ * barcode scanner — then runs ML Kit Text Recognition on the captured frame.
  *
- * Install:
- *   npm install @jcesarmobile/capacitor-ocr
- *   npx cap sync android
+ * Pipeline:
+ *   1. JS calls TextScan.scan()
+ *   2. TextScanActivity opens: live CameraX preview + guide overlay
+ *   3. User points camera at medicine box and taps "مسح"
+ *   4. ML Kit Text Recognition runs on-device (<200 ms)
+ *   5. Raw text is returned to JS via Activity result
+ *   6. parseOcrText() structures the raw text into form fields
+ *
+ * No internet used at any step.
+ * No npm package needed — the plugin lives inside android/app/src/main/java/.
  */
 
-import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const isNative = Capacitor.isNativePlatform();
-const OCR_TEMP  = 'homemed-ocr-temp.jpg';
+
+// ── Native plugin interface ───────────────────────────────────────────────────
+
+interface TextScanPlugin {
+  /** Opens the native camera viewfinder and returns the recognised text. */
+  scan(): Promise<{ text: string }>;
+}
+
+// registerPlugin links the JS call to the @CapacitorPlugin(name="TextScan") class.
+const TextScan = registerPlugin<TextScanPlugin>('TextScan');
 
 // ── Public result type ────────────────────────────────────────────────────────
 
@@ -38,138 +50,62 @@ export class OcrNoTextError extends Error {
   constructor(msg = 'No text detected. Try better lighting or a clearer angle.') { super(msg); }
 }
 
-// ── Step 1 — open native camera and return the captured File ──────────────────
-
-export function openCameraCapture(): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type   = 'file';
-    input.accept = 'image/*';
-    input.setAttribute('capture', 'environment'); // rear camera preferred
-
-    // Must be briefly in the DOM on some Android WebViews
-    input.style.cssText = 'position:fixed;top:-9999px;opacity:0;pointer-events:none';
-    document.body.appendChild(input);
-
-    let settled = false;
-    const done = (file?: File) => {
-      if (settled) return;
-      settled = true;
-      try { document.body.removeChild(input); } catch {}
-      if (file) resolve(file);
-      else reject(new OcrNoTextError('No image selected.'));
-    };
-
-    input.onchange = () => done(input.files?.[0]);
-
-    // Detect camera dismissal — the WebView gets focus back when user closes camera
-    const timer = window.setTimeout(() => {
-      window.removeEventListener('focus', onFocus);
-    }, 60_000);
-    const onFocus = () => {
-      clearTimeout(timer);
-      window.setTimeout(() => { if (!settled) done(); }, 600);
-    };
-    window.addEventListener('focus', onFocus, { once: true });
-
-    input.click();
-  });
-}
-
-// ── Step 2+3 — save to cache and run ML Kit OCR on-device ────────────────────
-
-async function runMlKitOcr(file: File): Promise<string> {
-  if (!isNative) throw new OcrNotSupportedError();
-
-  // Read as base64 data URL then strip the header
-  const base64 = await new Promise<string>((res, rej) => {
-    const reader = new FileReader();
-    reader.onload  = () => res((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = () => rej(new Error('Failed to read image'));
-    reader.readAsDataURL(file);
-  });
-
-  // Write to cache dir so the native plugin can open it by file path
-  await Filesystem.writeFile({
-    path:      OCR_TEMP,
-    data:      base64,
-    directory: Directory.Cache,
-  });
-
-  const { uri } = await Filesystem.getUri({
-    path:      OCR_TEMP,
-    directory: Directory.Cache,
-  });
-
-  let rawText = '';
-  try {
-    // Dynamic import keeps the web build clean; package only present on native
-    const { OCR } = await import('@jcesarmobile/capacitor-ocr');
-    const result  = await OCR.recognizeText({ filename: uri });
-    rawText = result.text?.trim() ?? '';
-  } finally {
-    // Best-effort cleanup — non-critical
-    Filesystem.deleteFile({ path: OCR_TEMP, directory: Directory.Cache }).catch(() => {});
-  }
-
-  if (!rawText) throw new OcrNoTextError();
-  return rawText;
-}
-
-// ── Step 4 — offline structured parser ───────────────────────────────────────
+// ── Offline structured parser ─────────────────────────────────────────────────
 //
-// Implements the same differentiation rules as the system prompt, in code:
+// Implements the same differentiation rules described in the system prompt:
 //
-//  medicine_name     — prominent commercial brand name (often ALL-CAPS, early in text)
+//  medicine_name     — commercial brand name (ALL-CAPS, prominent, early in text)
 //  active_ingredient — chemical/generic name (in parentheses or after DCI/INN labels)
 //  dosage_strength   — numeric + unit (500mg, 1g, 200mg/5ml …)
 //  form              — physical form keyword (Comprimé, Capsules, Sirop …)
 //  additional_info   — remaining warnings, storage info, lab names
 //
-// Medicine box text in this region (Algeria/Morocco/France) is usually French
-// with some Arabic, so patterns cover both.
+// Text from Algerian / Moroccan / French medicine boxes is usually French with
+// some Arabic, so all patterns cover both scripts.
 
-const DOSAGE_RE = /\b(\d+(?:[.,]\d+)?\s*(?:mg|g|ml|mcg|µg|UI|IU|MG|G|ML)(?:\s*\/\s*\d+\s*(?:ml|g|ML|G))?)/i;
+const DOSAGE_RE =
+  /\b(\d+(?:[.,]\d+)?\s*(?:mg|g|ml|mcg|µg|UI|IU|MG|G|ML)(?:\s*\/\s*\d+\s*(?:ml|g|ML|G))?)/i;
 
-const FORM_RE = /\b(comprim[ée]s?|g[ée]lules?|capsules?|sirop|suspension|solution|pommade|cr[eè]me?|injectable|ampoules?|sachet|suppositoire|lozenge|granul[ée]s?|inhaler?|spray|a[ée]rosol|patch|ointment|tablets?|capsule|syrup|cream|\bgel\b|drops?|gouttes?|poudre|powder)\b/i;
+const FORM_RE =
+  /\b(comprim[ée]s?|g[ée]lules?|capsules?|sirop|suspension|solution|pommade|cr[eè]me?|injectable|ampoules?|sachet|suppositoire|lozenge|granul[ée]s?|inhaler?|spray|a[ée]rosol|patch|ointment|tablets?|capsule|syrup|cream|\bgel\b|drops?|gouttes?|poudre|powder)\b/i;
 
 const SKIP_RE = new RegExp(
   FORM_RE.source + '|' +
   DOSAGE_RE.source + '|' +
-  /boîte|comprimés|gélules|اقراص|كبسولات|شراب|laboratoire|pharma|production|ministère|وزارة|قرص/i.source,
+  /boîte|gélules|اقراص|كبسولات|شراب|laboratoire|pharma|production|ministère|وزارة|قرص/i.source,
   'i',
 );
 
 function parseOcrText(rawText: string): OcrScanResult {
   const lines = rawText.split(/[\n\r]+/).map((l) => l.trim()).filter(Boolean);
 
-  // ── dosage_strength ────────────────────────────────────────────────────────
+  // ── dosage_strength ──────────────────────────────────────────────────────
   const dosage_strength = rawText.match(DOSAGE_RE)?.[1]?.trim() ?? null;
 
-  // ── form ──────────────────────────────────────────────────────────────────
+  // ── form ─────────────────────────────────────────────────────────────────
   const form = rawText.match(FORM_RE)?.[1] ?? null;
 
-  // ── active_ingredient ─────────────────────────────────────────────────────
-  // Priority 1 — content inside parentheses that looks like a chemical name
+  // ── active_ingredient ────────────────────────────────────────────────────
+  // Priority 1: chemical name inside parentheses — e.g. "Doliprane (Paracétamol)"
   let active_ingredient: string | null = null;
   for (const m of rawText.matchAll(/\(([A-Za-zÀ-ÖØ-öø-ÿ][^()]{3,60})\)/g)) {
-    const candidate = m[1].trim();
-    if (!/^\d/.test(candidate) && !/^(boîte|box|flacon|ml|mg)/i.test(candidate)) {
-      active_ingredient = candidate;
+    const c = m[1].trim();
+    if (!/^\d/.test(c) && !/^(boîte|box|flacon|ml|mg)/i.test(c)) {
+      active_ingredient = c;
       break;
     }
   }
-  // Priority 2 — after a DCI / INN / "substance active" label
+  // Priority 2: after a DCI / INN / "substance active" label
   if (!active_ingredient) {
     const dciM = rawText.match(
-      /(?:DCI|INN|Substance active|Principe actif|مادة فعالة|المادة الفعالة)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ][^\n,;(]{3,60})/i,
+      /(?:DCI|INN|Substance\s+active|Principe\s+actif|مادة\s+فعالة|المادة\s+الفعالة)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ][^\n,;(]{3,60})/i,
     );
     if (dciM) active_ingredient = dciM[1].trim();
   }
 
   // ── medicine_name ─────────────────────────────────────────────────────────
-  // Priority 1 — short ALL-CAPS line (brand names on French medicine boxes are
-  //              almost always printed in uppercase and appear alone on a line)
+  // Priority 1: short ALL-CAPS line — brand names on French medicine boxes are
+  //             almost always printed in uppercase and appear alone on a line.
   const capsLine = lines.find(
     (l) =>
       l.length >= 3 && l.length <= 30 &&
@@ -179,7 +115,7 @@ function parseOcrText(rawText: string): OcrScanResult {
       !FORM_RE.test(l) &&
       l !== active_ingredient,
   );
-  // Priority 2 — first clean line that isn't a form / dosage / ingredient
+  // Priority 2: first clean line that isn't a form / dosage / ingredient
   const cleanLine = lines.find(
     (l) =>
       l.length >= 3 && l.length <= 50 &&
@@ -190,11 +126,8 @@ function parseOcrText(rawText: string): OcrScanResult {
   const medicine_name = capsLine ?? cleanLine ?? null;
 
   // ── additional_info ───────────────────────────────────────────────────────
-  // Everything beyond the first 3 lines that wasn't already captured,
-  // capped at 300 characters so it fits the notes field cleanly.
   const usedSet = new Set(
-    [medicine_name, active_ingredient, dosage_strength, form]
-      .filter(Boolean) as string[],
+    [medicine_name, active_ingredient, dosage_strength, form].filter(Boolean) as string[],
   );
   const additional_info =
     lines
@@ -207,7 +140,6 @@ function parseOcrText(rawText: string): OcrScanResult {
 }
 
 // ── Form-value mapper ─────────────────────────────────────────────────────────
-// Maps free-text OCR form descriptions to the app's MedicineForm union values.
 
 const FORM_MAP: Array<[RegExp, string]> = [
   [/comprim[ée]|tablet/i,        'tablets'],
@@ -240,14 +172,27 @@ export function mapOcrFormToMedicineForm(ocrForm: string | null): string | null 
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /**
- * Full offline pipeline: capture → ML Kit OCR → regex parse → result.
+ * Opens the native camera viewfinder, waits for the user to tap Scan,
+ * runs on-device ML Kit OCR, and returns structured form data.
  *
- * Throws:
- *   OcrNotSupportedError  — running in browser/web, not on native Android
- *   OcrNoTextError        — image captured but ML Kit found no text
- *   Error                 — unexpected native crash (pages show scanBoxError)
+ * Throws OcrNotSupportedError  — called from a browser / non-native build
+ * Throws OcrNoTextError        — user cancelled or no text found
  */
-export async function scanBoxAndParse(file: File): Promise<OcrScanResult> {
-  const rawText = await runMlKitOcr(file);
+export async function scanBoxAndParse(): Promise<OcrScanResult> {
+  if (!isNative) throw new OcrNotSupportedError();
+
+  let rawText: string;
+  try {
+    const result = await TextScan.scan();
+    rawText = result.text?.trim() ?? '';
+  } catch (err: unknown) {
+    // "CANCELLED" is a normal user action, map to OcrNoTextError so the page
+    // clears the loading state without showing a toast.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('CANCELLED')) throw new OcrNoTextError('Scan cancelled.');
+    throw err;
+  }
+
+  if (!rawText) throw new OcrNoTextError();
   return parseOcrText(rawText);
 }
