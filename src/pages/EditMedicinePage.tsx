@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, ImagePlus, X, ScanLine, Info, Loader2, MapPin, Bell, Camera, CheckCircle2 } from 'lucide-react';
+import { Pencil, ImagePlus, X, ScanLine, Info, Loader2, MapPin, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,12 +34,6 @@ import {
   BarcodePermissionDeniedError,
 } from '@/services/barcodeService';
 import DoseReminderEditor from '@/components/DoseReminderEditor';
-import {
-  scanBoxAndParse,
-  mapOcrFormToMedicineForm,
-  OcrNotSupportedError,
-  OcrNoTextError,
-} from '@/services/ocrScanService';
 import { reminderToDraft, draftToReminder } from '@/services/doseReminderService';
 
 interface EditMedicinePageProps {
@@ -60,11 +54,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
   const [reminderDraft, setReminderDraft] = useState(() =>
     reminderToDraft(null)
   );
-  const [ocrScanning, setOcrScanning]         = useState(false);
-  const [ocrFilledFields, setOcrFilledFields] = useState<Set<string>>(new Set());
-
-  const ocrCls = (field: string) =>
-    ocrFilledFields.has(field) ? 'ring-2 ring-emerald-500/40 border-emerald-500/50' : '';
 
   useEffect(() => {
     const med = getMedicationById(medId);
@@ -73,31 +62,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       setReminderDraft(reminderToDraft(med.reminder));
     }
   }, [medId]);
-
-  const handleScanBox = async () => {
-    if (!form) return;
-    setOcrScanning(true);
-    try {
-      const result  = await scanBoxAndParse();
-      const filled  = new Set<string>();
-
-      if (result.medicine_name)     { update('name',             result.medicine_name);    filled.add('name'); }
-      if (result.active_ingredient) { update('activeIngredient', result.active_ingredient); filled.add('activeIngredient'); }
-      if (result.dosage_strength)   { update('dosage',           result.dosage_strength);  filled.add('dosage'); }
-      const mappedForm = mapOcrFormToMedicineForm(result.form);
-      if (mappedForm)               { update('form',             mappedForm);              filled.add('form'); }
-      if (result.additional_info)   { update('notes',            result.additional_info);  filled.add('notes'); }
-
-      setOcrFilledFields(filled);
-      toast(filled.size > 0 ? t('scanBoxSuccess') : t('scanBoxNoText'));
-    } catch (err) {
-      if (err instanceof OcrNotSupportedError)  toast(t('scanBoxNotSupported'));
-      else if (err instanceof OcrNoTextError)   toast(t('scanBoxNoText'));
-      else                                       toast(t('scanBoxError'));
-    } finally {
-      setOcrScanning(false);
-    }
-  };
 
   const handleScanBarcode = async () => {
     setScanning(true);
@@ -164,10 +128,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
 
   const update = (field: keyof Medication, value: any) => {
     setForm((prev) => (prev ? { ...prev, [field]: value } : null));
-    setOcrFilledFields((prev) => {
-      if (!prev.has(field as string)) return prev;
-      const next = new Set(prev); next.delete(field as string); return next;
-    });
     if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -209,38 +169,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* ── Smart Camera Scan ──────────────────────────────────────── */}
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Camera className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">{t('scanBoxTitle')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{t('scanBoxDesc')}</p>
-                </div>
-              </div>
-              {ocrFilledFields.size > 0 && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                  {t('scanBoxSuccess')}
-                </div>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full gap-2"
-                onClick={handleScanBox}
-                disabled={ocrScanning || scanning}
-              >
-                {ocrScanning
-                  ? <><Loader2 className="w-4 h-4 animate-spin" />{t('scanBoxScanning')}</>
-                  : <><Camera className="w-4 h-4" />{ocrFilledFields.size > 0 ? t('scanBoxScanAgain') : t('scanBoxButton')}</>
-                }
-              </Button>
-            </div>
-
             {/* Name */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
@@ -277,7 +205,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
                 placeholder={t('medicineName')}
-                className={[errors.name ? 'border-destructive' : '', ocrCls('name')].filter(Boolean).join(' ')}
+                className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
@@ -302,7 +230,6 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                   value={form.activeIngredient}
                   onChange={(e) => update('activeIngredient', e.target.value)}
                   placeholder={t('activeIngredient')}
-                  className={ocrCls('activeIngredient')}
                 />
               </div>
 
@@ -316,7 +243,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                   value={form.dosage}
                   onChange={(e) => update('dosage', e.target.value)}
                   placeholder={t('dosageExample')}
-                  className={[errors.dosage ? 'border-destructive' : '', ocrCls('dosage')].filter(Boolean).join(' ')}
+                  className={errors.dosage ? 'border-destructive' : ''}
                 />
                 {errors.dosage && <p className="text-xs text-destructive">{errors.dosage}</p>}
               </div>
