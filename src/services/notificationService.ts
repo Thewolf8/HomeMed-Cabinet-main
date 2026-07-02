@@ -9,6 +9,12 @@ const CHANNEL_ID = 'homemed-expiry';
 let channelReady = false;
 let permissionRequested = false;
 
+/** Quantity at or below this triggers a one-time low-stock alert. Also used by useMedications.ts for the dashboard "low stock" stat, so both stay in sync. */
+export const LOW_STOCK_THRESHOLD = 5;
+
+const LOW_STOCK_CHANNEL_ID = 'homemed-lowstock';
+let lowStockChannelReady = false;
+
 // Small, self-contained set of strings for the system notification itself —
 // kept local (rather than pulled from the main i18n dictionary) since this
 // code can run outside the React tree.
@@ -44,6 +50,43 @@ function notifStrings() {
   }
   if (lang === 'ar' || lang === 'fr') return NOTIF_STRINGS[lang];
   return NOTIF_STRINGS.en;
+}
+
+// Self-contained strings for the low-stock channel, same rationale as
+// NOTIF_STRINGS above — kept local rather than pulled from the main i18n
+// dictionary since this can fire from outside the React tree.
+const LOW_STOCK_STRINGS = {
+  en: {
+    title: 'Running low',
+    body: (name: string, dosage: string, qty: number) =>
+      qty <= 0
+        ? `${name} (${dosage}) is out of stock.`
+        : `${name} (${dosage}) — only ${qty} left.`,
+  },
+  ar: {
+    title: 'الكمية منخفضة',
+    body: (name: string, dosage: string, qty: number) =>
+      qty <= 0
+        ? `${name} (${dosage}) — نفدت الكمية بالكامل.`
+        : `${name} (${dosage}) — تبقّى ${qty} فقط.`,
+  },
+  fr: {
+    title: 'Stock faible',
+    body: (name: string, dosage: string, qty: number) =>
+      qty <= 0
+        ? `${name} (${dosage}) est en rupture de stock.`
+        : `${name} (${dosage}) — il ne reste que ${qty}.`,
+  },
+} as const;
+
+function lowStockStrings() {
+  let lang = getSettings().language;
+  if (lang === 'system') {
+    const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
+    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : 'en';
+  }
+  if (lang === 'ar' || lang === 'fr') return LOW_STOCK_STRINGS[lang];
+  return LOW_STOCK_STRINGS.en;
 }
 
 /**
@@ -197,5 +240,71 @@ export async function cancelMedicationNotifications(
     await LocalNotifications.cancel({ notifications: toCancel });
   } catch {
     // Nothing to do — the notification may already have fired/been cleared.
+  }
+}
+
+// ==================== Low-stock alert ====================
+// Fired once, exactly when a medication's quantity crosses at or below
+// LOW_STOCK_THRESHOLD as a result of a confirmed dose deduction — never
+// re-fired on every subsequent dose while it stays low, so the user isn't
+// nagged daily about something they already know.
+
+async function ensureLowStockChannelReady(): Promise<void> {
+  if (lowStockChannelReady || !isNative) return;
+  lowStockChannelReady = true;
+  try {
+    await LocalNotifications.createChannel({
+      id: LOW_STOCK_CHANNEL_ID,
+      name: 'Low Stock Alerts',
+      description: 'Alerts when a medicine quantity drops to a low level',
+      importance: 4, // HIGH
+      visibility: 1,
+    });
+  } catch {
+    // Android-only; ignore failures on other platforms
+  }
+}
+
+/**
+ * Own id band, deliberately clear of:
+ *   - notificationService expiry ids   (≈ 0           .. 1,000,000,000)
+ *   - doseReminderService dose/snooze  (≈ 1,200,000,000 .. 1,700,000,100)
+ * and capped well under Android's 32-bit notification-id ceiling
+ * (2,147,483,647), since hashToInt's own output can be up to ~500,000,000.
+ */
+const LOW_STOCK_ID_OFFSET = 1_800_000_000;
+function lowStockNotificationId(medId: string): number {
+  return LOW_STOCK_ID_OFFSET + (hashToInt(medId) % 200_000_000);
+}
+
+/**
+ * Fires an immediate, one-shot "running low" notification. `remainingQuantity`
+ * is shown in the body so the user knows exactly how urgent it is (including
+ * 0, which reads naturally as "out of stock").
+ */
+export async function scheduleLowStockAlert(
+  med: Pick<Medication, 'id' | 'name' | 'dosage'>,
+  remainingQuantity: number
+): Promise<void> {
+  const ready = await ensureReady();
+  if (!ready) return;
+  await ensureLowStockChannelReady();
+
+  const s = lowStockStrings();
+  try {
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: lowStockNotificationId(med.id),
+          title: s.title,
+          body: s.body(med.name, med.dosage, remainingQuantity),
+          schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
+          channelId: LOW_STOCK_CHANNEL_ID,
+          smallIcon: 'ic_stat_homemed',
+        },
+      ],
+    });
+  } catch {
+    // Best-effort — a missed low-stock nudge isn't critical.
   }
 }
