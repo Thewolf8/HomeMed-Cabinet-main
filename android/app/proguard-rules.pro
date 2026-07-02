@@ -99,13 +99,6 @@
 -keep class com.capacitorjs.plugins.localnotifications.** { *; }
 -keep class com.capacitorjs.plugins.camera.** { *; }
 -keep class com.capacitorjs.plugins.barcodescanner.** { *; }
-# @jcesarmobile/capacitor-ocr — on-device ML Kit Text Recognition (Smart Camera Scan)
-# ML Kit text recognition models are resolved by name at runtime.
--keep class com.google.mlkit.vision.text.** { *; }
--keep class com.google.mlkit.vision.common.** { *; }
--keep class com.google.android.gms.vision.** { *; }
--dontwarn com.google.mlkit.**
--dontwarn com.google.android.gms.vision.**
 
 
 
@@ -166,17 +159,3 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
-
-# ── CameraX — Smart Camera Scan (TextScanActivity) ───────────────────────────
-# CameraX resolves camera implementations and surface providers by class name.
--keep class androidx.camera.** { *; }
--dontwarn androidx.camera.**
-
-# ML Kit Text Recognition (bundled model, fully offline)
--keep class com.google.mlkit.vision.text.** { *; }
--keep class com.google.mlkit.vision.common.** { *; }
--dontwarn com.google.mlkit.**
-
-# Guava ListenableFuture — used by CameraX internally
--keep class com.google.common.util.concurrent.** { *; }
--dontwarn com.google.common.**
