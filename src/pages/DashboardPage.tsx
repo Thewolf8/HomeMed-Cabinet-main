@@ -17,6 +17,7 @@ import {
   Bell,
   Clock,
   BellOff,
+  Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,9 @@ import { EMERGENCY_ITEMS } from '@/types/medication';
 import type { Page } from '@/App';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import { reconcileReminderDay } from '@/services/doseReminderService';
+import { useProfile } from '@/context/ProfileContext';
+import { getProfileReminders } from '@/services/profileService';
+import { PROFILE_COLOR_CLASSES } from '@/types/profile';
 
 interface DueReminderEntry {
   medication: Medication;
@@ -128,6 +132,7 @@ export default function DashboardPage({
   onConfirmDose,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
+  const { profiles, activeProfile, switchProfile } = useProfile();
   const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showDeleteExpiredConfirm, setShowDeleteExpiredConfirm] = useState(false);
@@ -185,6 +190,25 @@ export default function DashboardPage({
   const renewalMedicines = medications.filter(
     (m) => m.quantity === 0 || getDaysUntilExpiration(m.expirationDate) < 0
   );
+
+  // ── Family Summary — today's dose status per profile ──────────────────────
+  // Reads each profile's reminder map directly (not just the active one,
+  // which is all `medications[].reminder` would give us) so the household
+  // member managing the cabinet can see everyone's progress at a glance.
+  const familyStatus = profiles.map((profile) => {
+    const remindersMap = getProfileReminders(profile.id);
+    const activeEntries = Object.values(remindersMap).filter((r) => r.enabled);
+
+    let total = 0;
+    let completed = 0;
+    for (const r of activeEntries) {
+      const reconciled = reconcileReminderDay(r);
+      total += reconciled.times.length;
+      completed += reconciled.confirmedToday.length;
+    }
+
+    return { profile, total, completed, hasReminders: activeEntries.length > 0 };
+  });
 
   // Emergency medicines with category — still used for navigation context
 
@@ -365,6 +389,64 @@ export default function DashboardPage({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Family Summary ────────────────────────────────────────── */}
+      {/* Only worth showing once there's more than one profile — for a
+          solo user this would just duplicate the reminder widget below. */}
+      {profiles.length > 1 && (
+        <motion.div variants={itemVariants} initial="hidden" animate="visible">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                {t('familySummaryTitle')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                {familyStatus.map(({ profile, total, completed, hasReminders }) => {
+                  const allDone   = hasReminders && completed >= total;
+                  const remaining = total - completed;
+                  const cls       = PROFILE_COLOR_CLASSES[profile.color];
+                  const isActive  = profile.id === activeProfile.id;
+
+                  return (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() => switchProfile(profile.id)}
+                      className={`flex flex-col items-center gap-1.5 shrink-0 w-[76px] p-2.5 rounded-xl border transition-all ${
+                        isActive ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-accent/50'
+                      }`}
+                    >
+                      <div className={`relative w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm ${cls.bg}`}>
+                        {profile.name.trim().charAt(0).toUpperCase()}
+                        {hasReminders && allDone && (
+                          <span className="absolute -bottom-0.5 -end-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-card flex items-center justify-center">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium truncate w-full text-center">{profile.name}</p>
+                      {hasReminders ? (
+                        allDone ? (
+                          <span className="text-[10px] text-emerald-500 font-medium">{t('familyAllDone')}</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-500 font-medium">
+                            {remaining} {t('familyDosesRemaining')}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">{t('familyNoReminders')}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* ── Dose Reminders Widget ─────────────────────────────────── */}
       {activeReminders.length > 0 && (
