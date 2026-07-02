@@ -324,6 +324,12 @@ export const translations = {
     reminderActive: 'Reminder',
     reminderWidgetTitle: 'Doses due today',
     reminderWidgetAllDone: 'All doses confirmed for today',
+
+    // Family Summary (Dashboard)
+    familySummaryTitle: 'Family Summary',
+    familyAllDone: 'All done',
+    familyDosesRemaining: 'remaining',
+    familyNoReminders: 'No reminders',
     reminderSetup: 'Set up dose reminder',
     reminderSave: 'Save reminder',
     reminderRemove: 'Remove',
@@ -710,6 +716,12 @@ export const translations = {
     reminderActive: 'تذكير',
     reminderWidgetTitle: 'جرعات اليوم المستحقة',
     reminderWidgetAllDone: 'تم تأكيد جميع جرعات اليوم',
+
+    // Family Summary (Dashboard)
+    familySummaryTitle: 'ملخص العائلة',
+    familyAllDone: 'منتهٍ',
+    familyDosesRemaining: 'متبقية',
+    familyNoReminders: 'لا تذكيرات',
     reminderSetup: 'إعداد تذكير الجرعة',
     reminderSave: 'حفظ التذكير',
     reminderRemove: 'حذف',
@@ -1096,6 +1108,12 @@ export const translations = {
     reminderActive: 'Rappel',
     reminderWidgetTitle: 'Doses dues aujourd\'hui',
     reminderWidgetAllDone: 'Toutes les doses du jour confirmées',
+
+    // Family Summary (Dashboard)
+    familySummaryTitle: 'Résumé familial',
+    familyAllDone: 'Tout fait',
+    familyDosesRemaining: 'restantes',
+    familyNoReminders: 'Aucun rappel',
     reminderSetup: 'Configurer le rappel de dose',
     reminderSave: 'Enregistrer le rappel',
     reminderRemove: 'Supprimer',
