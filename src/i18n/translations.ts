@@ -353,18 +353,6 @@ export const translations = {
     profileDeleteConfirm: 'Delete this profile? Their reminders and dose history will be permanently removed.',
     profileMaxReached: 'Maximum 6 profiles reached.',
 
-    // Smart Camera Scan (OCR)
-    scanBoxButton: 'Scan Box',
-    scanBoxScanAgain: 'Scan Again',
-    scanBoxTitle: 'Smart Camera Scan',
-    scanBoxDesc: 'Take a photo of the medicine box to auto-fill the form fields.',
-    scanBoxScanning: 'Scanning…',
-    scanBoxSuccess: 'Fields auto-filled — review and correct if needed.',
-    scanBoxNoText: 'No text detected. Try better lighting or a clearer angle.',
-    scanBoxError: 'Scan failed. Try again or fill in manually.',
-    scanBoxNotSupported: 'Camera scan is only available on the installed Android app.',
-    scanBoxAutoFilledBadge: 'Auto-filled',
-
     // Onboarding    // Onboarding
     onboardingSkip: 'Skip',
     onboardingNext: 'Next',
@@ -751,18 +739,6 @@ export const translations = {
     profileDeleteConfirm: 'حذف هذا الملف؟ سيتم حذف تذكيراته وسجل جرعاته نهائياً.',
     profileMaxReached: 'الحد الأقصى 6 ملفات شخصية.',
 
-    // Smart Camera Scan (OCR)
-    scanBoxButton: 'مسح الصندوق',
-    scanBoxScanAgain: 'إعادة المسح',
-    scanBoxTitle: 'المسح الذكي بالكاميرا',
-    scanBoxDesc: 'التقط صورة لعلبة الدواء لملء حقول النموذج تلقائياً.',
-    scanBoxScanning: '...جاري المسح',
-    scanBoxSuccess: 'تم ملء الحقول تلقائياً — راجع وصحح عند الحاجة.',
-    scanBoxNoText: 'لم يُكتشف نص. جرّب إضاءة أفضل أو زاوية أوضح.',
-    scanBoxError: 'فشل المسح. حاول مرة أخرى أو أدخل البيانات يدوياً.',
-    scanBoxNotSupported: 'المسح بالكاميرا متاح فقط في تطبيق أندرويد المثبت.',
-    scanBoxAutoFilledBadge: 'ملء تلقائي',
-
     // Onboarding    // Onboarding
     onboardingSkip: 'تخطي',
     onboardingNext: 'التالي',
@@ -1148,18 +1124,6 @@ export const translations = {
     profileColorLabel: 'Choisir une couleur',
     profileDeleteConfirm: 'Supprimer ce profil ? Ses rappels et son historique de doses seront définitivement effacés.',
     profileMaxReached: 'Maximum 6 profils atteint.',
-
-    // Smart Camera Scan (OCR)
-    scanBoxButton: 'Scanner la boîte',
-    scanBoxScanAgain: 'Scanner à nouveau',
-    scanBoxTitle: 'Scan intelligent par caméra',
-    scanBoxDesc: 'Photographiez la boîte de médicament pour remplir le formulaire automatiquement.',
-    scanBoxScanning: 'Scan en cours…',
-    scanBoxSuccess: 'Champs remplis automatiquement — vérifiez et corrigez si besoin.',
-    scanBoxNoText: 'Aucun texte détecté. Essayez un meilleur éclairage ou angle.',
-    scanBoxError: 'Scan échoué. Réessayez ou remplissez manuellement.',
-    scanBoxNotSupported: "Le scan par caméra est disponible uniquement sur l'appli Android installée.",
-    scanBoxAutoFilledBadge: 'Rempli auto',
 
     // Onboarding    // Onboarding
     onboardingSkip: 'Passer',
