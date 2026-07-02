@@ -22,6 +22,8 @@ import { getSettings } from '@/hooks/useSettings';
 import {
   scheduleMedicationNotifications,
   cancelMedicationNotifications,
+  scheduleLowStockAlert,
+  LOW_STOCK_THRESHOLD,
 } from '@/services/notificationService';
 import {
   scheduleDoseReminders,
@@ -432,6 +434,13 @@ export function useMedications() {
             confirmedToday: [...finalReminder.confirmedToday, doseTime],
           };
 
+          // Low-stock alert — fire exactly once, the moment this deduction
+          // crosses the threshold from "fine" to "running low" (or empty).
+          // Re-confirming further doses while already low won't re-fire.
+          if (med.quantity > LOW_STOCK_THRESHOLD && newQuantity <= LOW_STOCK_THRESHOLD) {
+            void scheduleLowStockAlert(med, newQuantity);
+          }
+
           if (newQuantity <= 0) {
             await cancelDoseReminders(finalReminder);
             finalReminder = { ...finalReminder, enabled: false, notificationIds: [] };
@@ -528,7 +537,7 @@ export function useMedications() {
       const d = getDaysUntilExpiration(m.expirationDate);
       return d >= 0 && d <= 30;
     }).length,
-    lowStock: medications.filter((m) => m.quantity <= 5).length,
+    lowStock: medications.filter((m) => m.quantity <= LOW_STOCK_THRESHOLD).length,
   };
 
   const emergencyReadiness = (() => {
