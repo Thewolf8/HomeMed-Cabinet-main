@@ -34,7 +34,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      # ── 4. تثبيت المكتبات (تم التغيير إلى npm install لحل مشكلة التزامن) ──
+      # ── 4. تثبيت المكتبات وتجهيز الـ CLI ───────────────────────
       - name: 📦 Install npm dependencies
         run: npm install
 
@@ -45,15 +45,15 @@ jobs:
       - name: 🔨 Build web app
         run: npx vite build
 
-      # ── 6. مزامنة Capacitor مع Android ───────────────────────
-      - name: 🔄 Capacitor sync → Android
-        run: npx cap sync android
-
-      # ── 7. توليد أيقونات التطبيق من الـ Assets ──────────────────
+      # ── 6. توليد أيقونات التطبيق (تم تقديمها قبل المزامنة) ─────
       - name: 🎨 Generate app icons from Assets
         run: |
           npm install @capacitor/assets
           npx @capacitor/assets generate --android
+
+      # ── 7. مزامنة Capacitor مع Android (لتشمل الموارد والأيقونات الجديدة) ──
+      - name: 🔄 Capacitor sync → Android
+        run: npx cap sync android
 
       # ══════════════════════════════════════════════════════════
       #  8. بناء نسخة Release غير موقعة
