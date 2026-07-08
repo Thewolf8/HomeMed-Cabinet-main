@@ -23,21 +23,25 @@ import {
 import { useI18n } from '@/i18n/I18nContext';
 import { useProfile } from '@/context/ProfileContext';
 import { getDoseLogs, clearDoseLogs } from '@/services/doseLogService';
+import { getSettings } from '@/hooks/useSettings';
 import { PROFILE_COLOR_CLASSES } from '@/types/profile';
 import type { DoseLog } from '@/types/doseLog';
 
 // ── Date helpers ───────────────────────────────────────────────────────────
 
-function todayLabel(t: (k: string) => string): string {
-  const d = new Date();
-  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
-function yesterdayStart(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  d.setHours(0, 0, 0, 0);
-  return d;
+/**
+ * Maps the app's stored language code to a BCP 47 locale string suitable for
+ * Intl / toLocaleDateString so dates render in the same language the user
+ * chose in Settings rather than defaulting to the device's system locale.
+ * 'system' defers to navigator.language exactly as the notification services do.
+ */
+function appLocale(): string {
+  const lang = getSettings().language;
+  if (lang === 'ar') return 'ar-DZ';   // Algerian Arabic — day/month names in Arabic
+  if (lang === 'fr') return 'fr-FR';
+  if (lang === 'en') return 'en-US';
+  // 'system' — honour the device's own locale
+  return (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
 }
 
 function dateKey(iso: string): string {
@@ -52,11 +56,13 @@ function formatGroupLabel(dateKeyStr: string, t: (k: string) => string): string 
   d.setHours(0, 0, 0, 0);
   if (d.getTime() === today.getTime()) return t('historyToday');
   if (d.getTime() === yesterday.getTime()) return t('historyYesterday');
-  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const locale = appLocale();
+  return d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const locale = appLocale();
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────

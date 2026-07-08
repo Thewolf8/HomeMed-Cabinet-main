@@ -204,7 +204,8 @@ export default function SettingsPage({
   const handleImportConfirm = (merge: boolean) => {
     if (importData) {
       const result = onImport(importData, merge);
-      toast(`${result.success} medicines imported`);
+      const count = result.success ?? 0;
+      toast(`${count} ${t('importSuccessCount')}`);
       setShowImportDialog(false);
       setImportData(null);
     }
