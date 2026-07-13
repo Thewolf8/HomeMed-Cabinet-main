@@ -19,6 +19,25 @@ export interface DoseReminder {
    * missing value as 'units' for full backward compatibility.
    */
   doseMode?: 'units' | 'volume' | 'none';
+  /**
+   * How often this reminder recurs:
+   *  - 'daily'    — due every day at `times` (the original/default model).
+   *  - 'weekly'   — due only on the days listed in `daysOfWeek`, at `times`.
+   *  - 'interval' — due every `intervalDays` days. Unlike a fixed calendar
+   *                 grid, the next due date is recalculated from the date
+   *                 of the last *actual* confirmation, so a late dose
+   *                 shifts the whole cadence forward with it rather than
+   *                 leaving the schedule to drift out of sync with reality.
+   * Absent on reminders stored before this field existed — always treat a
+   * missing value as 'daily' for full backward compatibility.
+   */
+  frequency?: 'daily' | 'weekly' | 'interval';
+  /** Days of week this reminder is due (0 = Sunday … 6 = Saturday, matching JS Date.getDay()). Used only when frequency === 'weekly'. */
+  daysOfWeek?: number[];
+  /** Number of days between doses (e.g. 2, 3). Used only when frequency === 'interval'. */
+  intervalDays?: number;
+  /** The next date (YYYY-MM-DD) this reminder is due. Used only when frequency === 'interval' — advances by intervalDays from the date of each full confirmation, not a fixed grid. */
+  nextDueDate?: string;
   /** The dose required per intake, in mg (e.g. 500). Used only when doseMode is 'units' (or absent). */
   doseMg: number;
   /** How many mg are in a single tablet/capsule/unit (e.g. 1000). Used to convert the dose into a fraction of a unit. Used only when doseMode is 'units' (or absent). */
