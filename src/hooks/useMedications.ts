@@ -7,7 +7,7 @@ import type {
   NotificationPreferences,
   DoseReminder,
 } from '@/types/medication';
-import { EMERGENCY_ITEMS } from '@/types/medication';
+import { EMERGENCY_ITEMS, isLowStock } from '@/types/medication';
 import {
   getMedications,
   addOrMergeMedication,
@@ -23,7 +23,6 @@ import {
   scheduleMedicationNotifications,
   cancelMedicationNotifications,
   scheduleLowStockAlert,
-  LOW_STOCK_THRESHOLD,
 } from '@/services/notificationService';
 import {
   scheduleDoseReminders,
@@ -412,42 +411,73 @@ export function useMedications() {
         let finalReminder: DoseReminder = { ...reminder, snoozeNotificationId: undefined };
 
         if (taken) {
-          const { newQuantity, newConsumedFraction } = computeDoseDeduction(reminder, med.quantity);
-          const unitsDeducted = med.quantity - newQuantity;
+          const mode = reminder.doseMode ?? 'units';
 
-          addDoseLog({
-            medicationId:   med.id,
-            medicationName: med.name,
-            activeIngredient: med.activeIngredient,
-            dosage:         med.dosage,
-            doseMg:         reminder.doseMg,
-            unitsDeducted,
-            quantityAfter:  newQuantity,
-            scheduledTime:  doseTime,
-            confirmedAt:    new Date().toISOString(),
-            source: 'reminder',
-          });
+          if (mode === 'none') {
+            // Cream/ointment/gel — a "remember to apply" reminder that never
+            // touches stock, since there's no reliable way to know how much
+            // is left in an opened tube. Still logged, so the confirmation
+            // shows up in dose history.
+            addDoseLog({
+              medicationId:   med.id,
+              medicationName: med.name,
+              activeIngredient: med.activeIngredient,
+              dosage:         med.dosage,
+              doseMg:         0,
+              unitsDeducted:  0,
+              quantityAfter:  med.quantity,
+              scheduledTime:  doseTime,
+              confirmedAt:    new Date().toISOString(),
+              source: 'reminder',
+            });
 
-          finalReminder = {
-            ...finalReminder,
-            consumedFraction: newConsumedFraction,
-            confirmedToday: [...finalReminder.confirmedToday, doseTime],
-          };
+            finalReminder = {
+              ...finalReminder,
+              confirmedToday: [...finalReminder.confirmedToday, doseTime],
+            };
+            setProfileReminder(pid, id, finalReminder);
+          } else {
+            const { newQuantity, newConsumedFraction } = computeDoseDeduction(reminder, med.quantity);
+            const unitsDeducted = med.quantity - newQuantity;
 
-          // Low-stock alert — fire exactly once, the moment this deduction
-          // crosses the threshold from "fine" to "running low" (or empty).
-          // Re-confirming further doses while already low won't re-fire.
-          if (med.quantity > LOW_STOCK_THRESHOLD && newQuantity <= LOW_STOCK_THRESHOLD) {
-            void scheduleLowStockAlert(med, newQuantity);
+            addDoseLog({
+              medicationId:   med.id,
+              medicationName: med.name,
+              activeIngredient: med.activeIngredient,
+              dosage:         med.dosage,
+              doseMg:         mode === 'units' ? reminder.doseMg : 0,
+              doseVolumeMl:   mode === 'volume' ? reminder.doseVolumeMl : undefined,
+              unitsDeducted,
+              quantityAfter:  newQuantity,
+              scheduledTime:  doseTime,
+              confirmedAt:    new Date().toISOString(),
+              source: 'reminder',
+            });
+
+            finalReminder = {
+              ...finalReminder,
+              consumedFraction: newConsumedFraction,
+              confirmedToday: [...finalReminder.confirmedToday, doseTime],
+            };
+
+            // Low-stock alert — fire exactly once, the moment this deduction
+            // crosses from "fine" to "running low" (percentage-of-full-pack
+            // when known, else the legacy absolute threshold). Re-confirming
+            // further doses while already low won't re-fire.
+            const wasLow   = isLowStock(med);
+            const isNowLow = isLowStock({ ...med, quantity: newQuantity });
+            if (!wasLow && isNowLow) {
+              void scheduleLowStockAlert(med, newQuantity);
+            }
+
+            if (newQuantity <= 0) {
+              await cancelDoseReminders(finalReminder);
+              finalReminder = { ...finalReminder, enabled: false, notificationIds: [] };
+            }
+
+            updateMedication(id, { quantity: newQuantity });
+            setProfileReminder(pid, id, finalReminder);
           }
-
-          if (newQuantity <= 0) {
-            await cancelDoseReminders(finalReminder);
-            finalReminder = { ...finalReminder, enabled: false, notificationIds: [] };
-          }
-
-          updateMedication(id, { quantity: newQuantity });
-          setProfileReminder(pid, id, finalReminder);
         } else {
           const snoozeId = await scheduleSnoozeReminder(med, doseTime);
           finalReminder  = { ...finalReminder, snoozeNotificationId: snoozeId };
@@ -537,7 +567,7 @@ export function useMedications() {
       const d = getDaysUntilExpiration(m.expirationDate);
       return d >= 0 && d <= 30;
     }).length,
-    lowStock: medications.filter((m) => m.quantity <= LOW_STOCK_THRESHOLD).length,
+    lowStock: medications.filter((m) => isLowStock(m)).length,
   };
 
   const emergencyReadiness = (() => {
