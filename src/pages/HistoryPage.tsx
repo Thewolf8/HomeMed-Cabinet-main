@@ -258,14 +258,22 @@ export default function HistoryPage() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{log.dosage}</p>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
-                          {log.doseMg} mg
-                        </span>
-                        {log.unitsDeducted > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            −{log.unitsDeducted} {t('units')}
+                        {log.doseVolumeMl != null && log.doseVolumeMl > 0 ? (
+                          <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                            {log.doseVolumeMl} ml
                           </span>
-                        )}
+                        ) : log.doseMg > 0 ? (
+                          <>
+                            <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                              {log.doseMg} mg
+                            </span>
+                            {log.unitsDeducted > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                −{log.unitsDeducted} {t('units')}
+                              </span>
+                            )}
+                          </>
+                        ) : null}
                         <span className="text-xs text-muted-foreground">
                           {t('historyScheduled')}: {log.scheduledTime}
                         </span>

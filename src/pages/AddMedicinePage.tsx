@@ -25,7 +25,7 @@ import { useI18n } from '@/i18n/I18nContext';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
-import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
+import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS, quantityCategoryForForm } from '@/types/medication';
 import {
   scanBarcodeOnce,
   findMedicationByBarcode,
@@ -46,6 +46,7 @@ const initialForm = {
   dosage: '',
   form: 'tablets' as Medication['form'],
   quantity: 1,
+  fullPackQuantity: undefined as number | undefined,
   expirationDate: '',
   usageInstructions: '',
   category: 'adult' as Medication['category'],
@@ -62,6 +63,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const { settings } = useSettings();
   const { toast } = useToast();
   const isMonthYear = settings.datePickerType === 'month-year';
+  const qtyCategory = quantityCategoryForForm(form.form);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
@@ -105,6 +107,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
           prescriptionRequired: known.prescriptionRequired,
           storageLocation: known.storageLocation,
           storageLocationNote: known.storageLocationNote ?? '',
+          fullPackQuantity: known.fullPackQuantity,
           barcode: code,
         }));
         setAutoFilled(true);
@@ -138,7 +141,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const reminder = draftToReminder(reminderDraft);
+    const reminder = draftToReminder(reminderDraft, form.form);
     onSave({ ...form, reminder });
     setForm(initialForm);
     setAutoFilled(false);
@@ -283,7 +286,11 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
 
               {/* Quantity */}
               <div className="space-y-1.5">
-                <Label htmlFor="quantity">{t('quantity')}</Label>
+                <Label htmlFor="quantity">
+                  {qtyCategory === 'volume' ? t('quantityLabelVolume')
+                    : qtyCategory === 'none' ? t('quantityLabelNone')
+                    : t('quantity')}
+                </Label>
                 <Input
                   id="quantity"
                   type="text"
@@ -315,6 +322,29 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                 )}
               </div>
             </div>
+
+            {/* Full pack quantity — only meaningful for forms that actually track stock */}
+            {qtyCategory !== 'none' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="fullPackQuantity">
+                  {qtyCategory === 'volume' ? t('fullPackLabelVolume') : t('fullPackLabelCount')}
+                  <span className="text-muted-foreground"> ({t('optional')})</span>
+                </Label>
+                <Input
+                  id="fullPackQuantity"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={form.fullPackQuantity ?? ''}
+                  placeholder={qtyCategory === 'volume' ? '200' : '30'}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    update('fullPackQuantity', raw === '' ? undefined : parseInt(raw, 10));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">{t('fullPackHint')}</p>
+              </div>
+            )}
 
             {/* Category */}
             <div className="space-y-1.5">
@@ -440,7 +470,7 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
                 <Bell className="w-3.5 h-3.5" />
                 {t('reminderSectionTitle')}
               </Label>
-              <DoseReminderEditor draft={reminderDraft} onChange={setReminderDraft} dosageHint={form.dosage} />
+              <DoseReminderEditor draft={reminderDraft} onChange={setReminderDraft} dosageHint={form.dosage} medicineForm={form.form} />
             </div>
 
             {/* Actions */}

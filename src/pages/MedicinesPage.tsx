@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Medication, MedicationFilters, SortField, SortOrder, MedicineCategory, DoseReminder } from '@/types/medication';
-import { MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
+import { MEDICINE_CATEGORIES, STORAGE_LOCATIONS, isLowStock, quantityCategoryForForm } from '@/types/medication';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import {
   AlertDialog,
@@ -415,14 +415,22 @@ export default function MedicinesPage({ medications, onEdit, onDelete, onAddNew,
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-sm truncate">{med.name}</h3>
                             {getExpirationBadge(med)}
-                            {med.quantity <= 5 && (
+                            {isLowStock(med) && (
                               <Badge variant="secondary" className="text-[10px] bg-orange-500/10 text-orange-500">
                                 {t('lowStockTag')}
                               </Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {med.dosage} &bull; {t('remaining')}: {med.quantity}
+                            {med.dosage}
+                            {quantityCategoryForForm(med.form) !== 'none' && (
+                              <>
+                                {' '}&bull; {t('remaining')}:{' '}
+                                {quantityCategoryForForm(med.form) === 'volume'
+                                  ? `${med.quantity} ml`
+                                  : med.quantity}
+                              </>
+                            )}
                           </p>
                         </div>
 

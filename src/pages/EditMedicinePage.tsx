@@ -25,7 +25,7 @@ import {
 import { useI18n } from '@/i18n/I18nContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Medication } from '@/types/medication';
-import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS } from '@/types/medication';
+import { MEDICINE_FORMS, MEDICINE_CATEGORIES, STORAGE_LOCATIONS, quantityCategoryForForm } from '@/types/medication';
 import { getMedicationById } from '@/services/medicationService';
 import {
   scanBarcodeOnce,
@@ -59,7 +59,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
     const med = getMedicationById(medId);
     if (med) {
       setForm(med);
-      setReminderDraft(reminderToDraft(med.reminder));
+      setReminderDraft(reminderToDraft(med.reminder, med.form));
     }
   }, [medId]);
 
@@ -106,13 +106,14 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form || !validate()) return;
-    const reminder = draftToReminder(reminderDraft, form.reminder);
+    const reminder = draftToReminder(reminderDraft, form.form, form.reminder);
     onSave(medId, {
       name: form.name,
       activeIngredient: form.activeIngredient,
       dosage: form.dosage,
       form: form.form,
       quantity: form.quantity,
+      fullPackQuantity: form.fullPackQuantity,
       expirationDate: form.expirationDate,
       usageInstructions: form.usageInstructions,
       category: form.category,
@@ -153,6 +154,8 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       </div>
     );
   }
+
+  const qtyCategory = quantityCategoryForForm(form.form);
 
   return (
     <motion.div
@@ -269,7 +272,11 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
 
               {/* Quantity */}
               <div className="space-y-1.5">
-                <Label htmlFor="quantity">{t('quantity')}</Label>
+                <Label htmlFor="quantity">
+                  {qtyCategory === 'volume' ? t('quantityLabelVolume')
+                    : qtyCategory === 'none' ? t('quantityLabelNone')
+                    : t('quantity')}
+                </Label>
                 <Input
                   id="quantity"
                   type="text"
@@ -306,6 +313,29 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 )}
               </div>
             </div>
+
+            {/* Full pack quantity — only meaningful for forms that actually track stock */}
+            {qtyCategory !== 'none' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="fullPackQuantity">
+                  {qtyCategory === 'volume' ? t('fullPackLabelVolume') : t('fullPackLabelCount')}
+                  <span className="text-muted-foreground"> ({t('optional')})</span>
+                </Label>
+                <Input
+                  id="fullPackQuantity"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={form.fullPackQuantity ?? ''}
+                  placeholder={qtyCategory === 'volume' ? '200' : '30'}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    update('fullPackQuantity', raw === '' ? undefined : parseInt(raw, 10));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">{t('fullPackHint')}</p>
+              </div>
+            )}
 
             {/* Category */}
             <div className="space-y-1.5">
@@ -435,6 +465,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
                 draft={reminderDraft}
                 onChange={setReminderDraft}
                 dosageHint={form.dosage}
+                medicineForm={form.form}
               />
             </div>
 

@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Medication, DashboardStats } from '@/types/medication';
-import { EMERGENCY_ITEMS } from '@/types/medication';
+import { EMERGENCY_ITEMS, isLowStock } from '@/types/medication';
 import type { Page } from '@/App';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import { reconcileReminderDay } from '@/services/doseReminderService';
@@ -173,7 +173,7 @@ export default function DashboardPage({
         return d >= 0 && d <= 30;
       });
     if (activeFilter === 'lowStock')
-      return medications.filter((m) => m.quantity <= 5);
+      return medications.filter((m) => isLowStock(m));
     return [];
   })();
 
