@@ -126,8 +126,19 @@ export function useMedications() {
         const rem = profileRems[med.id];
         if (!rem?.enabled) continue;
 
-        // Re-schedule if notification IDs are missing (first run / cleared by OS).
-        if (!rem.notificationIds || rem.notificationIds.length === 0) {
+        const frequency = rem.frequency ?? 'daily';
+        const missingSchedule = !rem.notificationIds || rem.notificationIds.length === 0;
+
+        // Weekly reminders pre-schedule a rolling lookahead window of
+        // upcoming occurrences (rather than a native "repeat weekly"
+        // trigger), so refresh it on every app open to keep the window
+        // extending forward. Daily/interval reminders only need a
+        // safety-net reschedule when their notification ids are missing
+        // (first run, or cleared by the OS).
+        if (missingSchedule || frequency === 'weekly') {
+          if (frequency === 'weekly' && !missingSchedule) {
+            await cancelDoseReminders(rem);
+          }
           const ids = await scheduleDoseReminders(med, rem);
           if (ids.length > 0) {
             profileRems[med.id] = { ...rem, notificationIds: ids };
@@ -136,6 +147,8 @@ export function useMedications() {
         }
 
         // Reset "confirmed today" if the calendar date has rolled over.
+        // (Interval reminders are excluded inside reconcileReminderDay —
+        // their progress tracks nextDueDate, not the calendar.)
         const reconciled = reconcileReminderDay(profileRems[med.id] ?? rem);
         if (reconciled !== (profileRems[med.id] ?? rem)) {
           profileRems[med.id] = reconciled;
@@ -435,7 +448,6 @@ export function useMedications() {
               ...finalReminder,
               confirmedToday: [...finalReminder.confirmedToday, doseTime],
             };
-            setProfileReminder(pid, id, finalReminder);
           } else {
             const { newQuantity, newConsumedFraction } = computeDoseDeduction(reminder, med.quantity);
             const unitsDeducted = med.quantity - newQuantity;
@@ -476,8 +488,37 @@ export function useMedications() {
             }
 
             updateMedication(id, { quantity: newQuantity });
-            setProfileReminder(pid, id, finalReminder);
           }
+
+          // ── Interval-mode advance ────────────────────────────────────────
+          // Once every time slot for the current due date is confirmed, move
+          // the schedule forward by intervalDays from TODAY (the actual
+          // confirmation date) rather than a fixed calendar grid — so a late
+          // confirmation shifts the whole cadence forward with it, matching
+          // how these medicines are actually meant to be taken.
+          const frequency = finalReminder.frequency ?? 'daily';
+          if (
+            finalReminder.enabled &&
+            frequency === 'interval' &&
+            finalReminder.intervalDays &&
+            finalReminder.confirmedToday.length >= finalReminder.times.length
+          ) {
+            await cancelDoseReminders(finalReminder);
+            const next = new Date();
+            next.setDate(next.getDate() + finalReminder.intervalDays);
+            const nextDueDate =
+              `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+            finalReminder = {
+              ...finalReminder,
+              nextDueDate,
+              confirmedDate: nextDueDate,
+              confirmedToday: [],
+            };
+            const newIds = await scheduleDoseReminders(med, finalReminder);
+            finalReminder = { ...finalReminder, notificationIds: newIds };
+          }
+
+          setProfileReminder(pid, id, finalReminder);
         } else {
           const snoozeId = await scheduleSnoozeReminder(med, doseTime);
           finalReminder  = { ...finalReminder, snoozeNotificationId: snoozeId };
