@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { Medication, NotificationPreferences } from '@/types/medication';
+import { LOW_STOCK_THRESHOLD } from '@/types/medication';
 import { getSettings } from '@/hooks/useSettings';
 
 const isNative = Capacitor.isNativePlatform();
@@ -9,8 +10,10 @@ const CHANNEL_ID = 'homemed-expiry';
 let channelReady = false;
 let permissionRequested = false;
 
-/** Quantity at or below this triggers a one-time low-stock alert. Also used by useMedications.ts for the dashboard "low stock" stat, so both stay in sync. */
-export const LOW_STOCK_THRESHOLD = 5;
+/** Re-exported for existing importers — the source of truth now lives in
+ * types/medication.ts alongside isLowStock(), so both the percentage-based
+ * and legacy absolute-threshold logic stay in one place. */
+export { LOW_STOCK_THRESHOLD };
 
 const LOW_STOCK_CHANNEL_ID = 'homemed-lowstock';
 let lowStockChannelReady = false;

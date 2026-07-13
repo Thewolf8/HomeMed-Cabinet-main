@@ -76,6 +76,13 @@ export function addOrMergeMedication(
       const merged: Medication = {
         ...match,
         quantity: match.quantity + med.quantity,
+        // Sum full-pack sizes too when both are known, so a merge of two
+        // identical 30-tablet boxes correctly reads as a 60-tablet full
+        // pack rather than leaving the old (now-wrong) 30 in place.
+        fullPackQuantity:
+          match.fullPackQuantity && med.fullPackQuantity
+            ? match.fullPackQuantity + med.fullPackQuantity
+            : (match.fullPackQuantity ?? med.fullPackQuantity),
         // Keep the freshest free-text fields, in case the user added more detail this time.
         usageInstructions: med.usageInstructions || match.usageInstructions,
         notes: med.notes || match.notes,

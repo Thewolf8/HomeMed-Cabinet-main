@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, type ActionPerformed } from '@capacitor/local-notifications';
-import type { DoseReminder, Medication } from '@/types/medication';
+import type { DoseReminder, Medication, MedicineForm } from '@/types/medication';
+import { doseCategoryForForm, SPOON_ML, DROP_VOLUME_ML } from '@/types/medication';
 import { getSettings } from '@/hooks/useSettings';
 import { hashToInt } from './notificationService';
 
@@ -104,15 +105,30 @@ async function ensureReady(): Promise<boolean> {
 }
 
 /**
- * Computes the dose-as-a-fraction-of-one-unit (e.g. 500mg dose / 1000mg per
- * tablet = 0.5), and the new quantity/accumulator after one confirmed dose.
- * Quantity only ever drops by whole units — partial consumption is carried
- * in `consumedFraction` until it accumulates to a full unit or more.
+ * Computes the new quantity/accumulator after one confirmed dose.
+ *  - 'volume' mode: doseVolumeMl is deducted from currentQuantity directly
+ *    (both already expressed in the same unit — ml), no fractional
+ *    accumulator needed since ml deductions don't need whole-unit rounding.
+ *  - 'units' mode (default, for backward compatibility with reminders that
+ *    predate doseMode): dose-as-a-fraction-of-one-unit (e.g. 500mg dose /
+ *    1000mg per tablet = 0.5). Quantity only ever drops by whole units —
+ *    partial consumption is carried in `consumedFraction` until it
+ *    accumulates to a full unit or more.
  */
 export function computeDoseDeduction(
-  reminder: Pick<DoseReminder, 'doseMg' | 'unitConcentrationMg' | 'consumedFraction'>,
+  reminder: Pick<DoseReminder, 'doseMode' | 'doseMg' | 'unitConcentrationMg' | 'consumedFraction' | 'doseVolumeMl'>,
   currentQuantity: number
 ): { newQuantity: number; newConsumedFraction: number } {
+  const mode = reminder.doseMode ?? 'units';
+
+  if (mode === 'volume') {
+    const vol = reminder.doseVolumeMl ?? 0;
+    return {
+      newQuantity: Math.max(0, currentQuantity - vol),
+      newConsumedFraction: 0,
+    };
+  }
+
   if (!reminder.unitConcentrationMg || reminder.unitConcentrationMg <= 0) {
     return { newQuantity: currentQuantity, newConsumedFraction: reminder.consumedFraction };
   }
@@ -145,57 +161,166 @@ export function suggestUnitConcentrationMg(dosage: string): number | undefined {
 }
 
 
+/** The full editable-draft shape, structurally matching DoseReminderDraft in DoseReminderEditor.tsx. */
+interface ReminderDraftShape {
+  enabled: boolean;
+  timesPerDay: number;
+  times: string[];
+  // 'units' mode (tablets/capsules/etc.)
+  doseMg: string;
+  unitConcentrationMg: string;
+  // 'volume' mode (syrup/solution/suspension)
+  volumeInputMode: 'ml' | 'spoon';
+  doseVolumeMl: string;
+  spoonCount: string;
+  spoonType: 'tablespoon' | 'teaspoon';
+  // 'drops' mode
+  doseDrops: string;
+}
+
+/** Resolves a volume-category draft's various input styles down to one final ml amount. */
+function resolveVolumeMl(draft: ReminderDraftShape, category: 'volume' | 'drops'): number {
+  if (category === 'drops') {
+    const drops = parseFloat(draft.doseDrops);
+    return isFinite(drops) && drops > 0 ? drops * DROP_VOLUME_ML : 0;
+  }
+  if (draft.volumeInputMode === 'spoon') {
+    const count = parseFloat(draft.spoonCount);
+    return isFinite(count) && count > 0 ? count * SPOON_ML[draft.spoonType] : 0;
+  }
+  const ml = parseFloat(draft.doseVolumeMl);
+  return isFinite(ml) && ml > 0 ? ml : 0;
+}
+
 /**
  * Converts an editable draft (from DoseReminderEditor) into a real
  * DoseReminder, preserving bookkeeping fields from the previous reminder
- * (if any) like consumedFraction and today's confirmations. Returns
- * undefined if the draft is disabled or invalid (so callers can treat that
- * as "no reminder").
+ * (if any) like consumedFraction and today's confirmations. `form` decides
+ * which dosing model applies (see doseCategoryForForm). Returns undefined
+ * if the draft is disabled or invalid (so callers can treat that as "no
+ * reminder").
  */
 export function draftToReminder(
-  draft: { enabled: boolean; doseMg: string; unitConcentrationMg: string; timesPerDay: number; times: string[] },
+  draft: ReminderDraftShape,
+  form: MedicineForm,
   previous?: DoseReminder | null
 ): DoseReminder | undefined {
   if (!draft.enabled) return undefined;
-  const doseMg = parseFloat(draft.doseMg);
-  const unitConcentrationMg = parseFloat(draft.unitConcentrationMg);
-  if (!isFinite(doseMg) || doseMg <= 0 || !isFinite(unitConcentrationMg) || unitConcentrationMg <= 0) {
-    return undefined;
-  }
   const times = draft.times.filter(Boolean);
   if (times.length === 0) return undefined;
 
-  return {
-    enabled: true,
-    doseMg,
-    unitConcentrationMg,
+  const category = doseCategoryForForm(form);
+  const base = {
+    enabled: true as const,
     timesPerDay: times.length,
     times,
-    consumedFraction: previous?.consumedFraction ?? 0,
     notificationIds: previous?.notificationIds ?? [],
     snoozeNotificationId: previous?.snoozeNotificationId,
     confirmedToday: previous?.confirmedToday ?? [],
     confirmedDate: previous?.confirmedDate ?? todayStr(),
   };
-}
 
-/** Converts a real DoseReminder (or none) into an editable draft. */
-export function reminderToDraft(reminder?: DoseReminder | null): {
-  enabled: boolean;
-  doseMg: string;
-  unitConcentrationMg: string;
-  timesPerDay: number;
-  times: string[];
-} {
-  if (!reminder) {
-    return { enabled: false, doseMg: '', unitConcentrationMg: '', timesPerDay: 2, times: defaultTimesForFrequency(2) };
+  if (category === 'none') {
+    // Cream/ointment/gel — the reminder fires and can be confirmed as a
+    // simple "remember to apply" nudge, but never touches stock.
+    return { ...base, doseMode: 'none', doseMg: 0, unitConcentrationMg: 0, consumedFraction: 0 };
+  }
+
+  if (category === 'volume' || category === 'drops') {
+    const doseVolumeMl = resolveVolumeMl(draft, category);
+    if (doseVolumeMl <= 0) return undefined;
+    return {
+      ...base,
+      doseMode: 'volume',
+      doseMg: 0,
+      unitConcentrationMg: 0,
+      consumedFraction: 0,
+      doseVolumeMl,
+    };
+  }
+
+  // 'units' — original tablet/capsule fraction-based model, unchanged.
+  const doseMg = parseFloat(draft.doseMg);
+  const unitConcentrationMg = parseFloat(draft.unitConcentrationMg);
+  if (!isFinite(doseMg) || doseMg <= 0 || !isFinite(unitConcentrationMg) || unitConcentrationMg <= 0) {
+    return undefined;
   }
   return {
+    ...base,
+    doseMode: 'units',
+    doseMg,
+    unitConcentrationMg,
+    consumedFraction: previous?.consumedFraction ?? 0,
+  };
+}
+
+/**
+ * Converts a real DoseReminder (or none) into an editable draft. `form`
+ * decides which stored fields map into which draft inputs — e.g. a
+ * volume-mode reminder on a 'drops' medication reconstructs a drop count
+ * (dividing the stored ml by the standard drop size) rather than showing
+ * the raw ml value.
+ */
+export function reminderToDraft(
+  reminder: DoseReminder | null | undefined,
+  form: MedicineForm = 'tablets'
+): ReminderDraftShape {
+  const emptyBase = {
+    volumeInputMode: 'ml' as const,
+    doseVolumeMl: '',
+    spoonCount: '',
+    spoonType: 'teaspoon' as const,
+    doseDrops: '',
+  };
+
+  if (!reminder) {
+    return {
+      enabled: false,
+      timesPerDay: 2,
+      times: defaultTimesForFrequency(2),
+      doseMg: '',
+      unitConcentrationMg: '',
+      ...emptyBase,
+    };
+  }
+
+  const mode = reminder.doseMode ?? 'units';
+  const category = doseCategoryForForm(form);
+
+  if (mode === 'volume' && category === 'drops') {
+    const ml = reminder.doseVolumeMl ?? 0;
+    const drops = ml > 0 ? Math.round(ml / DROP_VOLUME_ML) : 0;
+    return {
+      enabled: reminder.enabled,
+      timesPerDay: reminder.timesPerDay,
+      times: reminder.times,
+      doseMg: '',
+      unitConcentrationMg: '',
+      ...emptyBase,
+      doseDrops: drops > 0 ? String(drops) : '',
+    };
+  }
+
+  if (mode === 'volume') {
+    return {
+      enabled: reminder.enabled,
+      timesPerDay: reminder.timesPerDay,
+      times: reminder.times,
+      doseMg: '',
+      unitConcentrationMg: '',
+      ...emptyBase,
+      doseVolumeMl: reminder.doseVolumeMl != null && reminder.doseVolumeMl > 0 ? String(reminder.doseVolumeMl) : '',
+    };
+  }
+
+  // 'units', 'none', or a legacy reminder with no doseMode at all.
+  return {
     enabled: reminder.enabled,
-    doseMg: String(reminder.doseMg),
-    unitConcentrationMg: String(reminder.unitConcentrationMg),
     timesPerDay: reminder.timesPerDay,
     times: reminder.times,
+    doseMg: mode === 'units' ? String(reminder.doseMg) : '',
+    unitConcentrationMg: mode === 'units' ? String(reminder.unitConcentrationMg) : '',
+    ...emptyBase,
   };
 }
 

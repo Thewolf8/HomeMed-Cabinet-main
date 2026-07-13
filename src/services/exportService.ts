@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 // @ts-ignore
 import { autoTable } from 'jspdf-autotable';
 import type { Medication } from '@/types/medication';
-import { EMERGENCY_ITEMS } from '@/types/medication';
+import { EMERGENCY_ITEMS, isLowStock } from '@/types/medication';
 import { saveAndShareFile, savePDFFile, downloadFile } from './fileSystem';
 import { getMedications } from './medicationService';
 import { encodeHomeMedFile } from './homemedFormat';
@@ -71,7 +71,7 @@ export async function exportToPDF(options: ExportOptions = {}): Promise<void> {
   // Summary stats
   const expired = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expired');
   const expiringSoon = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expiring-soon');
-  const lowStock = medications.filter((m) => m.quantity <= 5);
+  const lowStock = medications.filter((m) => isLowStock(m));
   
   doc.setFontSize(10);
   doc.text(`Total Medicines: ${medications.length}`, 14, 42);
@@ -323,7 +323,7 @@ export async function downloadInventory(format: ExportFormat, options: ExportOpt
       doc.text(`Total Medicines: ${medications.length}`, 14, 42);
       doc.text(`Expired: ${expired.length}`, 14, 48);
       doc.text(`Expiring Soon: ${expiringSoon.length}`, 14, 54);
-      doc.text(`Low Stock: ${medications.filter((m) => m.quantity <= 5).length}`, 14, 60);
+      doc.text(`Low Stock: ${medications.filter((m) => isLowStock(m)).length}`, 14, 60);
 
       let yPos = 70;
       if (medications.length > 0) {
