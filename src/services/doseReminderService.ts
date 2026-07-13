@@ -19,6 +19,42 @@ function doseNotificationId(medId: string, timeIndex: number): number {
   return DOSE_ID_OFFSET + hashToInt(medId) + timeIndex;
 }
 
+// Weekly/interval reminders are scheduled as one-off dated notifications
+// (rather than relying on native "repeat weekly" triggers, whose weekday
+// numbering conventions differ across platforms and are easy to get
+// backwards) — each occurrence gets its own id in a sub-band starting at
+// +1000, well clear of the daily per-time slots (0-3) and the snooze slot
+// (100) used above.
+const OCCURRENCE_SLOT_BASE = 1000;
+const MAX_WEEKLY_OCCURRENCES = 16; // ~lookahead window; refreshed on every app open
+
+function occurrenceNotificationId(medId: string, occurrenceIndex: number): number {
+  return DOSE_ID_OFFSET + hashToInt(medId) + OCCURRENCE_SLOT_BASE + occurrenceIndex;
+}
+
+/**
+ * Computes the next `count` upcoming (date, time) occurrences for a set of
+ * weekdays + daily times, starting from now. Pure JS Date arithmetic — no
+ * reliance on native "weekday" trigger numbering, which is easy to get
+ * backwards between platforms.
+ */
+function computeUpcomingWeeklyOccurrences(daysOfWeek: number[], times: string[], count: number): Date[] {
+  const occurrences: Date[] = [];
+  const now = new Date();
+  for (let dayOffset = 0; occurrences.length < count && dayOffset < 70; dayOffset++) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
+    if (!daysOfWeek.includes(day.getDay())) continue;
+    for (const time of times) {
+      const [h, m] = time.split(':').map(Number);
+      const occurrence = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, 0, 0);
+      if (occurrence.getTime() <= now.getTime()) continue; // skip times already passed today
+      occurrences.push(occurrence);
+      if (occurrences.length >= count) break;
+    }
+  }
+  return occurrences;
+}
+
 function snoozeNotificationId(medId: string): number {
   return DOSE_ID_OFFSET + hashToInt(medId) + SNOOZE_SLOT;
 }
@@ -166,6 +202,10 @@ interface ReminderDraftShape {
   enabled: boolean;
   timesPerDay: number;
   times: string[];
+  // Recurrence pattern
+  frequency: 'daily' | 'weekly' | 'interval';
+  daysOfWeek: number[];    // for 'weekly'
+  intervalDays: string;    // for 'interval' — string so it can be freely typed, parsed on save
   // 'units' mode (tablets/capsules/etc.)
   doseMg: string;
   unitConcentrationMg: string;
@@ -209,15 +249,44 @@ export function draftToReminder(
   const times = draft.times.filter(Boolean);
   if (times.length === 0) return undefined;
 
+  // Validate frequency-specific fields before proceeding.
+  if (draft.frequency === 'weekly' && draft.daysOfWeek.length === 0) return undefined;
+  let intervalDays: number | undefined;
+  if (draft.frequency === 'interval') {
+    intervalDays = parseInt(draft.intervalDays, 10);
+    if (!isFinite(intervalDays) || intervalDays < 1) return undefined;
+  }
+
   const category = doseCategoryForForm(form);
+
+  // Switching frequency starts fresh rather than carrying over confirmation
+  // progress that no longer makes sense under the new schedule (e.g. a
+  // half-confirmed daily reminder becoming weekly).
+  const previousFrequency = previous?.frequency ?? 'daily';
+  const frequencyChanged = previousFrequency !== draft.frequency;
+
+  const nextDueDate =
+    draft.frequency === 'interval'
+      ? (!frequencyChanged && previous?.nextDueDate) || todayStr()
+      : undefined;
+
   const base = {
     enabled: true as const,
     timesPerDay: times.length,
     times,
-    notificationIds: previous?.notificationIds ?? [],
-    snoozeNotificationId: previous?.snoozeNotificationId,
-    confirmedToday: previous?.confirmedToday ?? [],
-    confirmedDate: previous?.confirmedDate ?? todayStr(),
+    frequency: draft.frequency,
+    daysOfWeek: draft.frequency === 'weekly' ? draft.daysOfWeek : undefined,
+    intervalDays: draft.frequency === 'interval' ? intervalDays : undefined,
+    nextDueDate,
+    notificationIds: frequencyChanged ? [] : previous?.notificationIds ?? [],
+    snoozeNotificationId: frequencyChanged ? undefined : previous?.snoozeNotificationId,
+    confirmedToday: frequencyChanged ? [] : previous?.confirmedToday ?? [],
+    confirmedDate:
+      draft.frequency === 'interval'
+        ? nextDueDate!
+        : frequencyChanged
+        ? todayStr()
+        : previous?.confirmedDate ?? todayStr(),
   };
 
   if (category === 'none') {
@@ -250,7 +319,7 @@ export function draftToReminder(
     doseMode: 'units',
     doseMg,
     unitConcentrationMg,
-    consumedFraction: previous?.consumedFraction ?? 0,
+    consumedFraction: frequencyChanged ? 0 : previous?.consumedFraction ?? 0,
   };
 }
 
@@ -278,11 +347,21 @@ export function reminderToDraft(
       enabled: false,
       timesPerDay: 2,
       times: defaultTimesForFrequency(2),
+      frequency: 'daily',
+      daysOfWeek: [],
+      intervalDays: '2',
       doseMg: '',
       unitConcentrationMg: '',
       ...emptyBase,
     };
   }
+
+  const frequency = reminder.frequency ?? 'daily';
+  const freqBase = {
+    frequency,
+    daysOfWeek: reminder.daysOfWeek ?? [],
+    intervalDays: reminder.intervalDays != null ? String(reminder.intervalDays) : '2',
+  };
 
   const mode = reminder.doseMode ?? 'units';
   const category = doseCategoryForForm(form);
@@ -294,6 +373,7 @@ export function reminderToDraft(
       enabled: reminder.enabled,
       timesPerDay: reminder.timesPerDay,
       times: reminder.times,
+      ...freqBase,
       doseMg: '',
       unitConcentrationMg: '',
       ...emptyBase,
@@ -306,6 +386,7 @@ export function reminderToDraft(
       enabled: reminder.enabled,
       timesPerDay: reminder.timesPerDay,
       times: reminder.times,
+      ...freqBase,
       doseMg: '',
       unitConcentrationMg: '',
       ...emptyBase,
@@ -318,6 +399,7 @@ export function reminderToDraft(
     enabled: reminder.enabled,
     timesPerDay: reminder.timesPerDay,
     times: reminder.times,
+    ...freqBase,
     doseMg: mode === 'units' ? String(reminder.doseMg) : '',
     unitConcentrationMg: mode === 'units' ? String(reminder.unitConcentrationMg) : '',
     ...emptyBase,
@@ -366,7 +448,15 @@ export function defaultTimesForFrequency(timesPerDay: number): string[] {
 }
 
 /**
- * Schedules one daily-repeating notification per entry in reminder.times.
+ * Schedules notifications for a reminder, shaped by its frequency:
+ *  - 'daily'    — one daily-repeating notification per entry in `times`
+ *                 (unchanged from the original model).
+ *  - 'weekly'   — a rolling lookahead window of one-off dated notifications
+ *                 (one per upcoming matching weekday × time), refreshed on
+ *                 every app open so the window keeps extending forward.
+ *  - 'interval' — one-off dated notifications for just the current
+ *                 `nextDueDate`, rescheduled to the new date each time the
+ *                 reminder fully advances (see useMedications.ts).
  * Returns the notification ids that were scheduled (to store on the
  * medication for later cancellation).
  */
@@ -375,7 +465,75 @@ export async function scheduleDoseReminders(med: Pick<Medication, 'id' | 'name'>
   const ready = await ensureReady();
   if (!ready) return [];
 
+  const frequency = reminder.frequency ?? 'daily';
   const s = strings();
+
+  if (frequency === 'weekly') {
+    if (!reminder.daysOfWeek || reminder.daysOfWeek.length === 0) return [];
+    const occurrences = computeUpcomingWeeklyOccurrences(reminder.daysOfWeek, reminder.times, MAX_WEEKLY_OCCURRENCES);
+    if (occurrences.length === 0) return [];
+
+    const notifications = occurrences.map((date, index) => ({
+      id: occurrenceNotificationId(med.id, index),
+      title: s.title,
+      body: s.body(med.name),
+      schedule: {
+        on: {
+          year: date.getFullYear(),
+          month: date.getMonth() + 1,
+          day: date.getDate(),
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+        },
+        allowWhileIdle: true,
+      },
+      channelId: CHANNEL_ID,
+      smallIcon: 'ic_stat_homemed',
+      actionTypeId: ACTION_TYPE_ID,
+      extra: {
+        medId: med.id,
+        doseTime: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+      },
+    }));
+
+    try {
+      await LocalNotifications.schedule({ notifications });
+      return notifications.map((n) => n.id);
+    } catch {
+      return [];
+    }
+  }
+
+  if (frequency === 'interval') {
+    if (!reminder.nextDueDate) return [];
+    const [year, month, day] = reminder.nextDueDate.split('-').map(Number);
+
+    const notifications = reminder.times.map((time, index) => {
+      const [hour, minute] = time.split(':').map(Number);
+      return {
+        // Interval reminders only ever have ONE active due date at a time,
+        // so reusing the time-index slot (0..timesPerDay-1) is safe here —
+        // it naturally overwrites the previous due date's notifications.
+        id: occurrenceNotificationId(med.id, index),
+        title: s.title,
+        body: s.body(med.name),
+        schedule: { on: { year, month, day, hour, minute }, allowWhileIdle: true },
+        channelId: CHANNEL_ID,
+        smallIcon: 'ic_stat_homemed',
+        actionTypeId: ACTION_TYPE_ID,
+        extra: { medId: med.id, doseTime: time },
+      };
+    });
+
+    try {
+      await LocalNotifications.schedule({ notifications });
+      return notifications.map((n) => n.id);
+    } catch {
+      return [];
+    }
+  }
+
+  // 'daily' — unchanged original model.
   const notifications = reminder.times.map((time, index) => {
     const [hour, minute] = time.split(':').map(Number);
     return {
@@ -460,15 +618,34 @@ export async function cancelSnoozeReminder(reminder?: DoseReminder | null): Prom
 /**
  * Resets confirmedToday/confirmedDate if the stored date doesn't match
  * today — call this whenever reading a reminder for "is X due now" logic.
+ * Interval-mode reminders are deliberately excluded: their confirmedToday
+ * tracks progress against `nextDueDate`, not the calendar date, and only
+ * resets explicitly when the due date itself advances (in
+ * useMedications.ts, on full confirmation) — never here — so a late or
+ * missed dose stays visibly due instead of silently disappearing at
+ * midnight.
  */
 export function reconcileReminderDay(reminder: DoseReminder): DoseReminder {
+  if ((reminder.frequency ?? 'daily') === 'interval') return reminder;
   const today = todayStr();
   if (reminder.confirmedDate === today) return reminder;
   return { ...reminder, confirmedDate: today, confirmedToday: [] };
 }
 
-/** Which of today's scheduled times are currently due (time has passed) and not yet confirmed. */
+/** Which of the reminder's scheduled times are currently due (time has passed, and — for weekly/interval — the day itself is due) and not yet confirmed. */
 export function getDueTimes(reminder: DoseReminder): string[] {
+  if (!reminder.enabled) return [];
+  const frequency = reminder.frequency ?? 'daily';
+
+  if (frequency === 'weekly') {
+    const todayWeekday = new Date().getDay();
+    if (!reminder.daysOfWeek?.includes(todayWeekday)) return [];
+  }
+
+  if (frequency === 'interval') {
+    if (!reminder.nextDueDate || todayStr() < reminder.nextDueDate) return [];
+  }
+
   const r = reconcileReminderDay(reminder);
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
