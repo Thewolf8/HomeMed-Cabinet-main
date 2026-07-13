@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nContext';
 import type { Medication, DoseReminder } from '@/types/medication';
+import { quantityCategoryForForm } from '@/types/medication';
 import { getDaysUntilExpiration } from '@/services/exportService';
 import DoseReminderEditor from '@/components/DoseReminderEditor';
 import { draftToReminder, reminderToDraft, getDueTimes } from '@/services/doseReminderService';
@@ -41,7 +42,7 @@ export default function MedicineBottomSheet({
   const { t } = useI18n();
   const [showReminderEditor, setShowReminderEditor] = useState(false);
   const [reminderDraft, setReminderDraft] = useState(() =>
-    reminderToDraft(medication?.reminder)
+    reminderToDraft(medication?.reminder, medication?.form)
   );
 
   // Sync the reminder draft whenever the medication prop changes — either
@@ -51,7 +52,7 @@ export default function MedicineBottomSheet({
   // the dependency is safe here because the object is small and this only
   // runs when the parent genuinely passes a new reference.
   useEffect(() => {
-    setReminderDraft(reminderToDraft(medication?.reminder));
+    setReminderDraft(reminderToDraft(medication?.reminder, medication?.form));
     // Only collapse the editor when switching to a completely different
     // medication — keep it open if the user just saved a new reminder so
     // they can see the result without extra taps.
@@ -69,7 +70,7 @@ export default function MedicineBottomSheet({
     days < 0 ? 'text-red-500' : days <= 30 ? 'text-amber-500' : 'text-emerald-500';
 
   const handleSaveReminder = () => {
-    const reminder = draftToReminder(reminderDraft, medication.reminder);
+    const reminder = draftToReminder(reminderDraft, medication.form, medication.reminder);
     if (reminder) {
       onSetReminder(medication.id, reminder);
     } else if (medication.reminder) {
@@ -122,10 +123,14 @@ export default function MedicineBottomSheet({
 
             {/* Key info chips */}
             <div className="flex flex-wrap gap-2 text-sm">
-              <span className="flex items-center gap-1.5 bg-muted/50 rounded-full px-3 py-1">
-                <Package className="w-3.5 h-3.5 shrink-0" />
-                {medication.quantity} {t('units')}
-              </span>
+              {quantityCategoryForForm(medication.form) !== 'none' && (
+                <span className="flex items-center gap-1.5 bg-muted/50 rounded-full px-3 py-1">
+                  <Package className="w-3.5 h-3.5 shrink-0" />
+                  {quantityCategoryForForm(medication.form) === 'volume'
+                    ? `${medication.quantity} ml`
+                    : `${medication.quantity} ${t('units')}`}
+                </span>
+              )}
               <span className={`flex items-center gap-1.5 bg-muted/50 rounded-full px-3 py-1 ${expiryColor}`}>
                 {days < 0 ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <Clock className="w-3.5 h-3.5 shrink-0" />}
                 {days < 0
@@ -216,6 +221,7 @@ export default function MedicineBottomSheet({
                     draft={reminderDraft}
                     onChange={setReminderDraft}
                     dosageHint={medication.dosage}
+                    medicineForm={medication.form}
                   />
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" onClick={handleSaveReminder} className="flex-1">

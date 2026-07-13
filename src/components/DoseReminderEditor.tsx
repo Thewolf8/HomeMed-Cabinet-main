@@ -3,31 +3,56 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useI18n } from '@/i18n/I18nContext';
 import { suggestUnitConcentrationMg, defaultTimesForFrequency } from '@/services/doseReminderService';
+import { doseCategoryForForm, SPOON_ML, DROP_VOLUME_ML } from '@/types/medication';
+import type { MedicineForm } from '@/types/medication';
 import { cn } from '@/lib/utils';
 
 /** Lightweight draft shape used while editing — numeric fields stay as
- * strings so the user can type freely, and are parsed/validated on save. */
+ * strings so the user can type freely, and are parsed/validated on save.
+ * Structurally matches ReminderDraftShape in doseReminderService.ts. */
 export interface DoseReminderDraft {
   enabled: boolean;
-  doseMg: string;
-  unitConcentrationMg: string;
   timesPerDay: number;
   times: string[];
+  // 'units' mode (tablets/capsules/etc.)
+  doseMg: string;
+  unitConcentrationMg: string;
+  // 'volume' mode (syrup/solution/suspension)
+  volumeInputMode: 'ml' | 'spoon';
+  doseVolumeMl: string;
+  spoonCount: string;
+  spoonType: 'tablespoon' | 'teaspoon';
+  // 'drops' mode
+  doseDrops: string;
 }
 
 export function emptyReminderDraft(): DoseReminderDraft {
-  return { enabled: false, doseMg: '', unitConcentrationMg: '', timesPerDay: 2, times: defaultTimesForFrequency(2) };
+  return {
+    enabled: false,
+    timesPerDay: 2,
+    times: defaultTimesForFrequency(2),
+    doseMg: '',
+    unitConcentrationMg: '',
+    volumeInputMode: 'ml',
+    doseVolumeMl: '',
+    spoonCount: '',
+    spoonType: 'teaspoon',
+    doseDrops: '',
+  };
 }
 
 interface DoseReminderEditorProps {
   draft: DoseReminderDraft;
   onChange: (draft: DoseReminderDraft) => void;
-  /** The medicine's existing free-text `dosage` field, used only to suggest a starting concentration. */
+  /** The medicine's existing free-text `dosage` field, used only to suggest a starting concentration in 'units' mode. */
   dosageHint?: string;
+  /** The medicine's form — determines which dosing input (units/volume/drops/none) is shown. */
+  medicineForm: MedicineForm;
 }
 
-export default function DoseReminderEditor({ draft, onChange, dosageHint }: DoseReminderEditorProps) {
+export default function DoseReminderEditor({ draft, onChange, dosageHint, medicineForm }: DoseReminderEditorProps) {
   const { t } = useI18n();
+  const category = doseCategoryForForm(medicineForm);
   const suggestion = dosageHint ? suggestUnitConcentrationMg(dosageHint) : undefined;
 
   const patch = (p: Partial<DoseReminderDraft>) => onChange({ ...draft, ...p });
@@ -42,11 +67,29 @@ export default function DoseReminderEditor({ draft, onChange, dosageHint }: Dose
     patch({ times });
   };
 
+  // ── 'units' mode math hint (tablets/capsules/etc. — unchanged from before) ──
   const doseNum = parseFloat(draft.doseMg);
   const concNum = parseFloat(draft.unitConcentrationMg);
-  const showMathHint = draft.enabled && doseNum > 0 && concNum > 0;
+  const showMathHint = category === 'units' && draft.enabled && doseNum > 0 && concNum > 0;
   const fraction = showMathHint ? doseNum / concNum : 0;
   const perDay = showMathHint ? fraction * draft.timesPerDay : 0;
+
+  // ── 'volume'/'drops' mode computed ml (for the confirmation hint) ──
+  const computedMl = (() => {
+    if (category === 'drops') {
+      const drops = parseFloat(draft.doseDrops);
+      return isFinite(drops) && drops > 0 ? drops * DROP_VOLUME_ML : 0;
+    }
+    if (category === 'volume') {
+      if (draft.volumeInputMode === 'spoon') {
+        const count = parseFloat(draft.spoonCount);
+        return isFinite(count) && count > 0 ? count * SPOON_ML[draft.spoonType] : 0;
+      }
+      const ml = parseFloat(draft.doseVolumeMl);
+      return isFinite(ml) && ml > 0 ? ml : 0;
+    }
+    return 0;
+  })();
 
   return (
     <div className="space-y-4">
@@ -61,35 +104,141 @@ export default function DoseReminderEditor({ draft, onChange, dosageHint }: Dose
           <Label htmlFor="reminder-enabled" className="cursor-pointer font-medium">
             {t('reminderEnable')}
           </Label>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('reminderEnableDesc')}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {category === 'none' ? t('reminderEnableDescNoStock') : t('reminderEnableDesc')}
+          </p>
         </div>
       </div>
 
       {draft.enabled && (
         <div className="space-y-4 ps-0 sm:ps-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">{t('reminderDoseMg')}</Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={draft.doseMg}
-                onChange={(e) => patch({ doseMg: e.target.value.replace(/[^0-9.]/g, '') })}
-                placeholder="500"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">{t('reminderUnitConcentration')}</Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={draft.unitConcentrationMg}
-                onChange={(e) => patch({ unitConcentrationMg: e.target.value.replace(/[^0-9.]/g, '') })}
-                placeholder={suggestion ? String(suggestion) : '1000'}
-              />
-            </div>
-          </div>
+          {/* ── Dose amount section — shape depends on the medicine's form ── */}
 
+          {category === 'units' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t('reminderDoseMg')}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.doseMg}
+                  onChange={(e) => patch({ doseMg: e.target.value.replace(/[^0-9.]/g, '') })}
+                  placeholder="500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t('reminderUnitConcentration')}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.unitConcentrationMg}
+                  onChange={(e) => patch({ unitConcentrationMg: e.target.value.replace(/[^0-9.]/g, '') })}
+                  placeholder={suggestion ? String(suggestion) : '1000'}
+                />
+              </div>
+            </div>
+          )}
+
+          {category === 'volume' && (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => patch({ volumeInputMode: 'ml' })}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-md border text-sm transition-colors',
+                    draft.volumeInputMode === 'ml'
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {t('reminderVolumeModeMl')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patch({ volumeInputMode: 'spoon' })}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-md border text-sm transition-colors',
+                    draft.volumeInputMode === 'spoon'
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {t('reminderVolumeModeSpoon')}
+                </button>
+              </div>
+
+              {draft.volumeInputMode === 'ml' ? (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t('reminderDoseVolumeMl')}</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft.doseVolumeMl}
+                    onChange={(e) => patch({ doseVolumeMl: e.target.value.replace(/[^0-9.]/g, '') })}
+                    placeholder="5"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t('reminderSpoonCount')}</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={draft.spoonCount}
+                      onChange={(e) => patch({ spoonCount: e.target.value.replace(/[^0-9.]/g, '') })}
+                      placeholder="1"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t('reminderSpoonType')}</Label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => patch({ spoonType: 'teaspoon' })}
+                        className={cn(
+                          'flex-1 py-1.5 rounded-md border text-xs transition-colors',
+                          draft.spoonType === 'teaspoon'
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-border text-muted-foreground hover:bg-accent'
+                        )}
+                      >
+                        {t('spoonTeaspoon')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => patch({ spoonType: 'tablespoon' })}
+                        className={cn(
+                          'flex-1 py-1.5 rounded-md border text-xs transition-colors',
+                          draft.spoonType === 'tablespoon'
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-border text-muted-foreground hover:bg-accent'
+                        )}
+                      >
+                        {t('spoonTablespoon')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {category === 'drops' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t('reminderDropsCount')}</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={draft.doseDrops}
+                onChange={(e) => patch({ doseDrops: e.target.value.replace(/[^0-9.]/g, '') })}
+                placeholder="3"
+              />
+            </div>
+          )}
+
+          {/* ── Times per day + specific times — shared by every dosing mode ── */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">{t('reminderTimesPerDay')}</Label>
             <div className="flex gap-2">
@@ -120,11 +269,24 @@ export default function DoseReminderEditor({ draft, onChange, dosageHint }: Dose
             </div>
           </div>
 
+          {/* ── Confirmation hints ── */}
           {showMathHint && (
             <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2.5 leading-relaxed">
               {t('reminderMathHint')
                 .replace('{fraction}', fraction.toFixed(2))
                 .replace('{perDay}', perDay.toFixed(2))}
+            </p>
+          )}
+
+          {(category === 'volume' || category === 'drops') && computedMl > 0 && (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2.5 leading-relaxed">
+              {t('reminderVolumeHint').replace('{ml}', computedMl.toFixed(2))}
+            </p>
+          )}
+
+          {category === 'none' && (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2.5 leading-relaxed">
+              {t('reminderNoStockHint')}
             </p>
           )}
         </div>
