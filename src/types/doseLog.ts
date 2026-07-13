@@ -5,8 +5,10 @@ export interface DoseLog {
   activeIngredient: string;
   /** Free-text dosage string from the medication (e.g. "500mg"). */
   dosage: string;
-  /** The dose taken in mg. */
+  /** The dose taken in mg. 0 when the dose was volume-based (see doseVolumeMl) or non-deducting. */
   doseMg: number;
+  /** The dose taken in ml, for volume-mode reminders (syrup/solution/suspension/drops). Absent for unit-based (mg) or non-deducting doses. */
+  doseVolumeMl?: number;
   /** How many whole units were deducted from stock for this dose. */
   unitsDeducted: number;
   /** Quantity remaining after this dose was deducted. */
