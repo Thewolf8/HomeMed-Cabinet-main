@@ -66,6 +66,26 @@ export default function MedicineBottomSheet({
   const days = getDaysUntilExpiration(medication.expirationDate);
   const dueTimes = medication.reminder ? getDueTimes(medication.reminder) : [];
 
+  /** Frequency-aware summary shown next to the Bell icon — e.g. day names
+   * for weekly reminders, or the next due date for interval reminders,
+   * instead of just the bare times (which alone don't convey "which day"). */
+  const reminderSummary = (() => {
+    const rem = medication.reminder;
+    if (!rem?.enabled) return null;
+    const timesStr = rem.times.join(' · ');
+    const freq = rem.frequency ?? 'daily';
+
+    if (freq === 'weekly' && rem.daysOfWeek?.length) {
+      const dayKeys = ['dayShortSun', 'dayShortMon', 'dayShortTue', 'dayShortWed', 'dayShortThu', 'dayShortFri', 'dayShortSat'] as const;
+      const days = [...rem.daysOfWeek].sort().map((d) => t(dayKeys[d])).join('، ');
+      return `${days} — ${timesStr}`;
+    }
+    if (freq === 'interval' && rem.nextDueDate) {
+      return `${t('reminderIntervalSummary').replace('{days}', String(rem.intervalDays ?? ''))} — ${timesStr}`;
+    }
+    return timesStr;
+  })();
+
   const expiryColor =
     days < 0 ? 'text-red-500' : days <= 30 ? 'text-amber-500' : 'text-emerald-500';
 
@@ -207,7 +227,7 @@ export default function MedicineBottomSheet({
                     <BellOff className="w-4 h-4 text-muted-foreground" />
                   )}
                   {medication.reminder?.enabled
-                    ? `${t('reminderActive')}: ${medication.reminder.times.join(' · ')}`
+                    ? `${t('reminderActive')}: ${reminderSummary}`
                     : t('reminderSetup')}
                 </span>
                 <span className="text-xs text-muted-foreground">

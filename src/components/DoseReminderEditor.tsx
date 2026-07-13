@@ -14,6 +14,10 @@ export interface DoseReminderDraft {
   enabled: boolean;
   timesPerDay: number;
   times: string[];
+  // Recurrence pattern
+  frequency: 'daily' | 'weekly' | 'interval';
+  daysOfWeek: number[];    // for 'weekly'
+  intervalDays: string;    // for 'interval'
   // 'units' mode (tablets/capsules/etc.)
   doseMg: string;
   unitConcentrationMg: string;
@@ -31,6 +35,9 @@ export function emptyReminderDraft(): DoseReminderDraft {
     enabled: false,
     timesPerDay: 2,
     times: defaultTimesForFrequency(2),
+    frequency: 'daily',
+    daysOfWeek: [],
+    intervalDays: '2',
     doseMg: '',
     unitConcentrationMg: '',
     volumeInputMode: 'ml',
@@ -40,6 +47,11 @@ export function emptyReminderDraft(): DoseReminderDraft {
     doseDrops: '',
   };
 }
+
+/** Short day-name translation keys, indexed 0=Sunday..6=Saturday to match JS Date.getDay(). */
+const DAY_LABELS_KEYS = [
+  'dayShortSun', 'dayShortMon', 'dayShortTue', 'dayShortWed', 'dayShortThu', 'dayShortFri', 'dayShortSat',
+] as const;
 
 interface DoseReminderEditorProps {
   draft: DoseReminderDraft;
@@ -112,6 +124,96 @@ export default function DoseReminderEditor({ draft, onChange, dosageHint, medici
 
       {draft.enabled && (
         <div className="space-y-4 ps-0 sm:ps-1">
+          {/* ── Frequency — when this reminder recurs ─────────────────────── */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">{t('reminderFrequency')}</Label>
+            <div className="flex gap-2">
+              {(['daily', 'weekly', 'interval'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => patch({ frequency: f })}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-md border text-sm transition-colors',
+                    draft.frequency === f
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {f === 'daily' ? t('frequencyDaily') : f === 'weekly' ? t('frequencyWeekly') : t('frequencyInterval')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Weekly: pick which day(s) ──────────────────────────────────── */}
+          {draft.frequency === 'weekly' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t('reminderDaysOfWeek')}</Label>
+              <div className="grid grid-cols-7 gap-1.5">
+                {DAY_LABELS_KEYS.map((key, dayIndex) => {
+                  const active = draft.daysOfWeek.includes(dayIndex);
+                  return (
+                    <button
+                      key={dayIndex}
+                      type="button"
+                      onClick={() => {
+                        const next = active
+                          ? draft.daysOfWeek.filter((d) => d !== dayIndex)
+                          : [...draft.daysOfWeek, dayIndex].sort();
+                        patch({ daysOfWeek: next });
+                      }}
+                      className={cn(
+                        'aspect-square rounded-md border text-xs font-medium transition-colors',
+                        active
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:bg-accent'
+                      )}
+                    >
+                      {t(key)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Interval: every N days ─────────────────────────────────────── */}
+          {draft.frequency === 'interval' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t('reminderIntervalDays')}</Label>
+              <div className="flex items-center gap-2">
+                {[2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => patch({ intervalDays: String(n) })}
+                    className={cn(
+                      'py-1.5 px-4 rounded-md border text-sm transition-colors',
+                      draft.intervalDays === String(n)
+                        ? 'border-primary bg-primary/10 text-primary font-medium'
+                        : 'border-border text-muted-foreground hover:bg-accent'
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={draft.intervalDays}
+                  onChange={(e) => patch({ intervalDays: e.target.value.replace(/[^0-9]/g, '') })}
+                  className="w-20"
+                  placeholder="5"
+                />
+                <span className="text-xs text-muted-foreground">{t('reminderIntervalSuffix')}</span>
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2.5 leading-relaxed">
+                {t('reminderIntervalHint')}
+              </p>
+            </div>
+          )}
+
           {/* ── Dose amount section — shape depends on the medicine's form ── */}
 
           {category === 'units' && (
