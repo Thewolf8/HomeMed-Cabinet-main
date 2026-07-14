@@ -1,4 +1,4 @@
- import type { SVGProps } from "react";
+import type { SVGProps } from "react";
 
 export default function AppLogo(props: SVGProps<SVGSVGElement>) {
   return (
@@ -9,30 +9,17 @@ export default function AppLogo(props: SVGProps<SVGSVGElement>) {
       {...props}
     >
       <g
-        transform="rotate(-45 256 256)"
+        transform="translate(256 256) rotate(-45) translate(-256 -256)"
         stroke="currentColor"
         strokeWidth="22"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
         {/* Capsule */}
-        <path d="
-          M 156 186
-          H 356
-          A 70 70 0 0 1 356 326
-          H 156
-          A 70 70 0 0 1 156 186
-          Z
-        " />
+        <path d="M156 186H356A70 70 0 0 1 356 326H156A70 70 0 0 1 156 186Z" />
 
-        {/* Split */}
-        <path d="
-          M 235 186
-          C 245 202 245 215 252 224
-          C 259 233 272 235 282 238
-          C 293 241 300 251 305 266
-          C 309 278 319 290 332 302
-        " />
+        {/* Divider */}
+        <path d="M256 186V326" />
       </g>
     </svg>
   );
