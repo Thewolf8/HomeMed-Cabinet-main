@@ -35,6 +35,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { useI18n } from '@/i18n/I18nContext';
+import AppLogo from '@/components/icons/AppLogo';
 import { useSettings } from '@/hooks/useSettings';
 import type { AppSettings, Language, Theme, NotificationPreferences } from '@/types/medication';
 import { readFileFromInput } from '@/services/fileSystem';
@@ -671,7 +672,7 @@ export default function SettingsPage({
         <Card>
           <CardContent className="p-6 text-center">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <Package className="w-6 h-6 text-primary" />
+              <AppLogo className="w-6 h-6 text-primary" />
             </div>
             <h3 className="font-bold text-lg">{t('appName')}</h3>
             <p className="text-sm text-muted-foreground mt-1">{t('appDescription')}</p>
