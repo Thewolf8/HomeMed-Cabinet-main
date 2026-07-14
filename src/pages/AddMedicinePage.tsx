@@ -63,8 +63,8 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
   const { settings } = useSettings();
   const { toast } = useToast();
   const isMonthYear = settings.datePickerType === 'month-year';
-  const qtyCategory = quantityCategoryForForm(form.form);
   const [form, setForm] = useState(initialForm);
+  const qtyCategory = quantityCategoryForForm(form.form);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
   const [showBarcodeInfo, setShowBarcodeInfo] = useState(false);
