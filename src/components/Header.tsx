@@ -1,4 +1,4 @@
-import { Pill } from 'lucide-react';
+import AppLogo from '@/components/icons/AppLogo';
 import { useI18n } from '@/i18n/I18nContext';
 import ProfileSwitcher from '@/components/ProfileSwitcher';
 import type { Page } from '@/App';
@@ -27,7 +27,7 @@ export default function Header({ currentPage }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="md:hidden flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Pill className="w-4 h-4 text-primary" />
+              <AppLogo className="w-4 h-4 text-primary" />
             </div>
             <span className="font-bold text-sm">{t('appName')}</span>
           </div>

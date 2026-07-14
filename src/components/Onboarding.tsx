@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useI18n } from '@/i18n/I18nContext';
+import AppLogo from '@/components/icons/AppLogo';
 import { useProfile } from '@/context/ProfileContext';
 import {
   PROFILE_COLORS,
@@ -33,7 +34,7 @@ function IllustrationWelcome() {
     <div className="relative flex items-center justify-center w-full h-52">
       {/* Central cabinet */}
       <div className="w-28 h-28 rounded-[28px] bg-primary/10 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/10">
-        <Package className="w-14 h-14 text-primary" />
+        <AppLogo className="w-14 h-14 text-primary" />
       </div>
 
       {/* Floating medicine cards */}
