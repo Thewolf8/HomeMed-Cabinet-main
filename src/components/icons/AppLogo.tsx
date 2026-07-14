@@ -3,7 +3,7 @@ import type { SVGProps } from "react";
 export default function AppLogo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 512 512"
+      viewBox="100 140 312 232"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -16,10 +16,10 @@ export default function AppLogo(props: SVGProps<SVGSVGElement>) {
         strokeLinejoin="round"
       >
         {/* Capsule */}
-        <path d="M156 186H356A70 70 0 0 1 356 326H156A70 70 0 0 1 156 186Z" />
+        <path d="M136 166H376A90 90 0 0 1 376 346H136A90 90 0 0 1 136 166Z" />
 
         {/* Divider */}
-        <path d="M256 186V326" />
+        <path d="M256 166V346" />
       </g>
     </svg>
   );
