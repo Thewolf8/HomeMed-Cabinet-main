@@ -73,6 +73,14 @@ export interface Medication {
   form: 'tablets' | 'capsules' | 'syrup' | 'solution' | 'suspension' | 'injection' | 'drops' | 'spray' | 'inhaler' | 'cream' | 'ointment' | 'gel' | 'patch' | 'suppository' | 'powder' | 'lozenge' | 'granules' | 'other';
   quantity: number;
   /**
+   * Marks this medicine as available in the Dashboard's quick-log strip —
+   * for medicines taken on demand (e.g. period-pain relief, PRN painkillers)
+   * rather than on a fixed schedule. Completely independent of the
+   * DoseReminder system: a quick-log entry is confirmed with a single tap
+   * and an amount, with no pre-configured time or dose to set up first.
+   */
+  asNeeded?: boolean;
+  /**
    * The size of a full, unopened package, in the same unit as `quantity`
    * (a plain count for tablets/capsules/etc., or ml for
    * syrup/solution/suspension/drops). Used to compute an accurate "running
