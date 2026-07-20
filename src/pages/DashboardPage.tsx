@@ -33,6 +33,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nContext';
+import QuickLogStrip from '@/components/QuickLogStrip';
+import type { ToastType } from '@/hooks/use-toast';
 import type { Medication, DashboardStats } from '@/types/medication';
 import { EMERGENCY_ITEMS, isLowStock } from '@/types/medication';
 import type { Page } from '@/App';
@@ -69,6 +71,8 @@ interface DashboardPageProps {
   activeReminders?: Medication[];
   dueReminders?: DueReminderEntry[];
   onConfirmDose?: (medId: string, doseTime: string, taken: boolean) => void;
+  onLogQuickDose?: (medId: string, amount: number) => void;
+  toast: ToastType;
 }
 
 type StatFilter = 'all' | 'total' | 'expiringSoon' | 'expired' | 'lowStock';
@@ -130,6 +134,8 @@ export default function DashboardPage({
   activeReminders = [],
   dueReminders = [],
   onConfirmDose,
+  onLogQuickDose,
+  toast,
 }: DashboardPageProps) {
   const { t, isRTL } = useI18n();
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -241,6 +247,12 @@ export default function DashboardPage({
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t('appName')}</h1>
         <p className="text-muted-foreground">{t('tagline')}</p>
       </motion.div>
+
+      {/* Quick-log strip for as-needed medicines — pinned near the top so
+          logging a PRN dose is always one or two taps away. */}
+      {onLogQuickDose && (
+        <QuickLogStrip medications={medications} onLog={onLogQuickDose} toast={toast} />
+      )}
 
       {/* Dynamic "Delete Expired Medications" banner — only appears when
           auto-delete is off and the app has detected expired medications. */}

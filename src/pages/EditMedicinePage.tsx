@@ -118,6 +118,7 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
       usageInstructions: form.usageInstructions,
       category: form.category,
       prescriptionRequired: form.prescriptionRequired,
+      asNeeded: form.asNeeded,
       notes: form.notes,
       image: form.image,
       barcode: form.barcode,
@@ -423,6 +424,22 @@ export default function EditMedicinePage({ medId, onSave, onCancel }: EditMedici
               <Label htmlFor="prescription" className="cursor-pointer">
                 {t('prescriptionRequired')}
               </Label>
+            </div>
+
+            {/* As-needed — appears in the Dashboard's quick-log strip instead of/alongside a scheduled reminder */}
+            <div className="flex items-start gap-3 py-2">
+              <Checkbox
+                id="asNeeded"
+                checked={form.asNeeded ?? false}
+                onCheckedChange={(checked) => update('asNeeded', !!checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="asNeeded" className="cursor-pointer">
+                  {t('asNeededLabel')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('asNeededDesc')}</p>
+              </div>
             </div>
 
             {/* Image Upload */}

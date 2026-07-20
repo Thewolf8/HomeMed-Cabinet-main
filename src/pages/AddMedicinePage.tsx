@@ -51,6 +51,7 @@ const initialForm = {
   usageInstructions: '',
   category: 'adult' as Medication['category'],
   prescriptionRequired: false,
+  asNeeded: false,
   notes: '',
   image: '',
   barcode: '',
@@ -432,6 +433,22 @@ export default function AddMedicinePage({ onSave, onCancel }: AddMedicinePagePro
               <Label htmlFor="prescription" className="cursor-pointer">
                 {t('prescriptionRequired')}
               </Label>
+            </div>
+
+            {/* As-needed — appears in the Dashboard's quick-log strip instead of/alongside a scheduled reminder */}
+            <div className="flex items-start gap-3 py-2">
+              <Checkbox
+                id="asNeeded"
+                checked={form.asNeeded}
+                onCheckedChange={(checked) => update('asNeeded', !!checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="asNeeded" className="cursor-pointer">
+                  {t('asNeededLabel')}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('asNeededDesc')}</p>
+              </div>
             </div>
 
             {/* Image Upload */}
