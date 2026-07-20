@@ -7,7 +7,7 @@ import type {
   NotificationPreferences,
   DoseReminder,
 } from '@/types/medication';
-import { EMERGENCY_ITEMS, isLowStock } from '@/types/medication';
+import { EMERGENCY_ITEMS, isLowStock, doseCategoryForForm } from '@/types/medication';
 import {
   getMedications,
   addOrMergeMedication,
@@ -531,6 +531,67 @@ export function useMedications() {
     [refresh],
   );
 
+  // ── Quick-log (as-needed medicines) ─────────────────────────────────────
+  // Completely independent of the DoseReminder system — no schedule, no
+  // pre-configured dose. The caller (QuickLogStrip) passes the exact
+  // amount the person picked (e.g. 0.5/1/2 units, or ml/drops), and this
+  // deducts it directly — no fractional accumulator needed since the
+  // amount is already the final, explicit value.
+  const logQuickDose = useCallback(
+    (medId: string, amount: number) => {
+      const med = getMedications().find((m) => m.id === medId);
+      if (!med) return;
+
+      const category = doseCategoryForForm(med.form);
+      const now = new Date();
+      const scheduledTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      if (category === 'none') {
+        // Cream/ointment/gel — log the application, nothing to deduct.
+        addDoseLog({
+          medicationId:   med.id,
+          medicationName: med.name,
+          activeIngredient: med.activeIngredient,
+          dosage:         med.dosage,
+          doseMg:         0,
+          unitsDeducted:  0,
+          quantityAfter:  med.quantity,
+          scheduledTime,
+          confirmedAt: now.toISOString(),
+          source: 'manual',
+        });
+        refresh();
+        return;
+      }
+
+      const newQuantity = Math.max(0, med.quantity - amount);
+
+      addDoseLog({
+        medicationId:   med.id,
+        medicationName: med.name,
+        activeIngredient: med.activeIngredient,
+        dosage:         med.dosage,
+        doseMg:         0,
+        doseVolumeMl:   category === 'volume' || category === 'drops' ? amount : undefined,
+        unitsDeducted:  amount,
+        quantityAfter:  newQuantity,
+        scheduledTime,
+        confirmedAt: now.toISOString(),
+        source: 'manual',
+      });
+
+      const wasLow   = isLowStock(med);
+      const isNowLow = isLowStock({ ...med, quantity: newQuantity });
+      if (!wasLow && isNowLow) {
+        void scheduleLowStockAlert(med, newQuantity);
+      }
+
+      updateMedication(med.id, { quantity: newQuantity });
+      refresh();
+    },
+    [refresh],
+  );
+
   useEffect(() => { confirmDoseRef.current = confirmDose; }, [confirmDose]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
@@ -649,6 +710,7 @@ export function useMedications() {
     setReminder,
     removeReminder,
     confirmDose,
+    logQuickDose,
     dueReminders,
     activeReminders,
   };
