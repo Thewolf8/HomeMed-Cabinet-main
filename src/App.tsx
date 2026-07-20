@@ -151,6 +151,8 @@ function AppContent() {
             dueReminders={medHook.dueReminders}
             activeReminders={medHook.activeReminders}
             onConfirmDose={medHook.confirmDose}
+            onLogQuickDose={medHook.logQuickDose}
+            toast={toast}
           />
         );
       case 'medicines':
