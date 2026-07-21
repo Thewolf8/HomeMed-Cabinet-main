@@ -677,7 +677,7 @@ export default function SettingsPage({
             <h3 className="font-bold text-lg">{t('appName')}</h3>
             <p className="text-sm text-muted-foreground mt-1">{t('appDescription')}</p>
             <p className="text-xs text-muted-foreground mt-3">
-              {t('version')} 1.0.2
+              {t('version')} 1.5.0
             </p>
           </CardContent>
         </Card>
