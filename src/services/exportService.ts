@@ -57,123 +57,155 @@ function getEmergencyReadiness(medications: Medication[]): { score: number; miss
 
 // ==================== PDF Export ====================
 
-export async function exportToPDF(options: ExportOptions = {}): Promise<void> {
+// Brand palette — kept consistent with the colors already used elsewhere
+// in the app (e.g. the format cards on ExportPage, low-stock/expiry
+// badges) so the PDF feels like part of the same product, not a
+// generic report.
+const COLOR_PRIMARY: [number, number, number] = [37, 99, 235]; // blue-600
+const COLOR_RED: [number, number, number] = [185, 28, 28]; // red-700
+const COLOR_RED_BG: [number, number, number] = [254, 226, 226]; // red-100
+const COLOR_AMBER: [number, number, number] = [180, 83, 9]; // amber-700
+const COLOR_AMBER_BG: [number, number, number] = [254, 243, 199]; // amber-100
+const COLOR_EMERALD: [number, number, number] = [4, 120, 87]; // emerald-700
+const COLOR_ORANGE: [number, number, number] = [194, 65, 12]; // orange-700
+const COLOR_MUTED: [number, number, number] = [107, 114, 128]; // gray-500
+const COLOR_DARK: [number, number, number] = [31, 41, 55]; // gray-800
+
+/**
+ * Builds the full inventory report as a jsPDF document — shared by both the
+ * "share" and "download" paths so they always produce identical, fully
+ * featured output (previously downloadInventory had its own trimmed-down
+ * copy of this logic that had drifted out of sync).
+ *
+ * Rows in the medicine table are color-coded by expiry status (red for
+ * expired, amber for expiring within 30 days) so the report is scannable
+ * at a glance without reading every cell.
+ */
+function buildPDF(options: ExportOptions = {}): jsPDF {
   const medications = getMedications();
   const doc = new jsPDF();
   const { includeEmergencySection = true } = options;
-  
-  // Title
-  doc.setFontSize(22);
-  doc.text('HomeMed Cabinet', 14, 20);
-  doc.setFontSize(12);
-  doc.text(`Inventory Report - ${new Date().toLocaleDateString()}`, 14, 30);
-  
-  // Summary stats
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // ── Header band ──
+  doc.setFillColor(...COLOR_PRIMARY);
+  doc.rect(0, 0, pageWidth, 30, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(19);
+  doc.text('HomeMed Cabinet', 14, 15);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Inventory Report — ${new Date().toLocaleDateString()}`, 14, 23);
+
+  // ── Summary stats ──
   const expired = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expired');
   const expiringSoon = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expiring-soon');
   const lowStock = medications.filter((m) => isLowStock(m));
-  
-  doc.setFontSize(10);
-  doc.text(`Total Medicines: ${medications.length}`, 14, 42);
-  doc.text(`Expired: ${expired.length}`, 14, 48);
-  doc.text(`Expiring Soon: ${expiringSoon.length}`, 14, 54);
-  doc.text(`Low Stock: ${lowStock.length}`, 14, 60);
-  
-  let yPos = 70;
-  
-  // Medicines table
+
+  let yPos = 42;
+  const stats: Array<[string, number, [number, number, number]]> = [
+    ['Total', medications.length, COLOR_DARK],
+    ['Expired', expired.length, COLOR_RED],
+    ['Expiring Soon', expiringSoon.length, COLOR_AMBER],
+    ['Low Stock', lowStock.length, COLOR_ORANGE],
+  ];
+  const colWidth = (pageWidth - 28) / stats.length;
+  stats.forEach(([label, count, color], i) => {
+    const x = 14 + i * colWidth;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(...color);
+    doc.text(String(count), x, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text(label, x, yPos + 5);
+  });
+
+  yPos += 15;
+
+  // ── Medicine table — color-coded by expiry status ──
   if (medications.length > 0) {
-    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...COLOR_DARK);
     doc.text('Medicine Inventory', 14, yPos);
-    yPos += 8;
-    
+    yPos += 7;
+
     const tableData = medications.map((med) => {
       const days = getDaysUntilExpiration(med.expirationDate);
       const status = days < 0 ? 'Expired' : days <= 30 ? `Expiring (${days}d)` : 'Valid';
-      return [
-        med.name,
-        med.dosage,
-        med.quantity.toString(),
-        new Date(med.expirationDate).toLocaleDateString(),
-        status,
-        med.category,
-      ];
+      const qty = isLowStock(med) ? `${med.quantity} ⚠` : String(med.quantity);
+      return [med.name, med.dosage, qty, new Date(med.expirationDate).toLocaleDateString(), status, med.category];
     });
-    
+
     autoTable(doc, {
       startY: yPos,
       head: [['Name', 'Dosage', 'Qty', 'Expires', 'Status', 'Category']],
       body: tableData,
       theme: 'striped',
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [59, 130, 246] },
+      headStyles: { fillColor: COLOR_PRIMARY, textColor: 255 },
+      didParseCell: (data: { section: string; row: { index: number }; cell: { styles: { fillColor?: unknown; textColor?: unknown } } }) => {
+        if (data.section !== 'body') return;
+        const med = medications[data.row.index];
+        if (!med) return;
+        const days = getDaysUntilExpiration(med.expirationDate);
+        if (days < 0) {
+          data.cell.styles.fillColor = COLOR_RED_BG;
+          data.cell.styles.textColor = COLOR_RED;
+        } else if (days <= 30) {
+          data.cell.styles.fillColor = COLOR_AMBER_BG;
+          data.cell.styles.textColor = COLOR_AMBER;
+        }
+      },
     });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
   }
-  
-  // Expiring medicines section
-  if (expiringSoon.length > 0 && yPos < 250) {
-    doc.setFontSize(14);
-    doc.text('Expiring Soon (30 days)', 14, yPos);
-    yPos += 8;
-    
-    const expiringData = expiringSoon.map((med) => {
-      const days = getDaysUntilExpiration(med.expirationDate);
-      return [med.name, med.dosage, `${days} days`];
-    });
-    
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Name', 'Dosage', 'Days Left']],
-      body: expiringData,
-      theme: 'striped',
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [245, 158, 11] },
-    });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-  }
-  
-  // Emergency readiness section
-  if (includeEmergencySection && yPos < 240) {
+
+  // ── Emergency readiness ──
+  if (includeEmergencySection && yPos < 250) {
     const readiness = getEmergencyReadiness(medications);
-    doc.setFontSize(14);
+    const badgeColor =
+      readiness.status === 'excellent' ? COLOR_EMERALD : readiness.status === 'moderate' ? COLOR_AMBER : COLOR_RED;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...COLOR_DARK);
     doc.text('Emergency Readiness', 14, yPos);
-    yPos += 8;
-    doc.setFontSize(10);
-    doc.text(`Score: ${readiness.score}% (${readiness.status})`, 14, yPos);
+    yPos += 7;
+
+    doc.setFontSize(11);
+    doc.setTextColor(...badgeColor);
+    doc.text(`${readiness.score}% — ${readiness.status}`, 14, yPos);
     yPos += 6;
-    
+
     if (readiness.missing.length > 0) {
-      doc.text(`Missing: ${readiness.missing.join(', ')}`, 14, yPos);
-      yPos += 10;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...COLOR_MUTED);
+      const missingLines = doc.splitTextToSize(`Missing: ${readiness.missing.join(', ')}`, pageWidth - 28);
+      doc.text(missingLines, 14, yPos);
     }
   }
-  
-  // AI Analysis Prompt on new page
-  doc.addPage();
-  doc.setFontSize(14);
-  doc.text('AI Analysis Prompt', 14, 20);
-  doc.setFontSize(10);
-  
-  const promptText = `Analyze this medicine inventory and determine:
-- Which prescribed medicines are already available
-- Possible alternatives based on active ingredients
-- Medicines nearing expiration
-- Potential duplicates
-- Missing emergency essentials
-- Possible medicine interactions
 
-This report is not medical advice.`;
-  
-  doc.text(promptText, 14, 35);
-  
-  // Disclaimer
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
-  doc.text('Generated by HomeMed Cabinet - This report is not medical advice.', 14, 280);
-  
+  // ── Disclaimer footer on every page ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text('Generated by HomeMed Cabinet — this report is not medical advice.', 14, 287);
+  }
+
+  return doc;
+}
+
+export async function exportToPDF(options: ExportOptions = {}): Promise<void> {
+  const doc = buildPDF(options);
   const pdfBase64 = doc.output('datauristring').split(',')[1];
   await savePDFFile(pdfBase64, `homemed-inventory-${Date.now()}.pdf`);
 }
@@ -228,16 +260,6 @@ function buildTXTContent(options: ExportOptions = {}): string {
   }
   
   content += '----------------------------------------\n';
-  content += '        AI ANALYSIS PROMPT\n';
-  content += '----------------------------------------\n\n';
-  content += 'Analyze this medicine inventory and determine:\n';
-  content += '- Which prescribed medicines are already available\n';
-  content += '- Possible alternatives based on active ingredients\n';
-  content += '- Medicines nearing expiration\n';
-  content += '- Potential duplicates\n';
-  content += '- Missing emergency essentials\n';
-  content += '- Possible medicine interactions\n\n';
-  content += 'This report is not medical advice.\n\n';
   content += '--- End of Report ---\n';
   
   return content;
@@ -307,50 +329,7 @@ export async function exportInventory(format: ExportFormat, options: ExportOptio
 export async function downloadInventory(format: ExportFormat, options: ExportOptions = {}): Promise<string> {
   switch (format) {
     case 'pdf': {
-      const medications = getMedications();
-      const doc = new jsPDF();
-      const { includeEmergencySection = true } = options;
-
-      doc.setFontSize(22);
-      doc.text('HomeMed Cabinet', 14, 20);
-      doc.setFontSize(12);
-      doc.text(`Inventory Report - ${new Date().toLocaleDateString()}`, 14, 30);
-
-      const expired = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expired');
-      const expiringSoon = medications.filter((m) => getExpirationStatus(m.expirationDate) === 'expiring-soon');
-
-      doc.setFontSize(10);
-      doc.text(`Total Medicines: ${medications.length}`, 14, 42);
-      doc.text(`Expired: ${expired.length}`, 14, 48);
-      doc.text(`Expiring Soon: ${expiringSoon.length}`, 14, 54);
-      doc.text(`Low Stock: ${medications.filter((m) => isLowStock(m)).length}`, 14, 60);
-
-      let yPos = 70;
-      if (medications.length > 0) {
-        doc.setFontSize(14);
-        doc.text('Medicine Inventory', 14, yPos);
-        yPos += 8;
-        const tableData = medications.map((med) => {
-          const days = getDaysUntilExpiration(med.expirationDate);
-          return [med.name, med.dosage, med.quantity.toString(), new Date(med.expirationDate).toLocaleDateString(), days < 0 ? 'Expired' : days <= 30 ? `Expiring (${days}d)` : 'Valid', med.category];
-        });
-        autoTable(doc, { startY: yPos, head: [['Name', 'Dosage', 'Qty', 'Expires', 'Status', 'Category']], body: tableData, theme: 'striped', styles: { fontSize: 9 }, headStyles: { fillColor: [59, 130, 246] } });
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-      }
-
-      if (includeEmergencySection && yPos < 240) {
-        const readiness = getEmergencyReadiness(medications);
-        doc.setFontSize(14);
-        doc.text('Emergency Readiness', 14, yPos);
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.text(`Score: ${readiness.score}% (${readiness.status})`, 14, yPos);
-        if (readiness.missing.length > 0) {
-          yPos += 6;
-          doc.text(`Missing: ${readiness.missing.join(', ')}`, 14, yPos);
-        }
-      }
-
+      const doc = buildPDF(options);
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       const filename = `homemed-inventory-${Date.now()}.pdf`;
       return await downloadFile(pdfBase64, filename, true);
