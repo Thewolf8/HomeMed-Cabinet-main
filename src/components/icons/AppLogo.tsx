@@ -1,33 +1,21 @@
-import type { SVGProps } from "react";
+import type { ImgHTMLAttributes } from 'react';
+import iconSrc from '@/assets/icon.png';
 
-export default function AppLogo(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      viewBox="16 16 480 480"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      {/* Rounded rectangle */}
-      <rect
-        x="136"
-        y="96"
-        width="240"
-        height="320"
-        rx="42"
-        stroke="currentColor"
-        strokeWidth="22"
-      />
-
-      {/* Plus */}
-      <g
-        stroke="#1E6BFF"
-        strokeWidth="28"
-        strokeLinecap="round"
-      >
-        <path d="M256 180V332" />
-        <path d="M180 256H332" />
-      </g>
-    </svg>
-  );
+/**
+ * The HomeMed Cabinet app logo. Uses the same source image as the native
+ * Android app icon (see /assets/icon.png — the master file Capacitor's icon
+ * generation reads), so every place the app's own branding appears in the
+ * UI (header, Settings "About" card, onboarding welcome screen) matches the
+ * home-screen icon exactly, with no separate hand-drawn approximation to
+ * keep in sync.
+ *
+ * Drop-in compatible with how this component was used before: pass a
+ * `className` with a size utility (`w-4 h-4`) to control the rendered size.
+ */
+export default function AppLogo({
+  className,
+  alt = '',
+  ...props
+}: ImgHTMLAttributes<HTMLImageElement>) {
+  return <img src={iconSrc} alt={alt} className={className} {...props} />;
 }
