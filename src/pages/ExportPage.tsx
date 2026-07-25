@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, FileSpreadsheet, FileJson, Share2, Download, Copy, Check, PackageCheck } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { FileText, FileSpreadsheet, FileJson, Share2, Download, PackageCheck } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/i18n/I18nContext';
@@ -64,7 +64,6 @@ export default function ExportPage({ settings }: ExportPageProps) {
   const { toast } = useToast();
   const [sharing, setSharing] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const handleShare = async (format: 'pdf' | 'txt' | 'json' | 'homemed') => {
     setSharing(format);
@@ -94,23 +93,6 @@ export default function ExportPage({ settings }: ExportPageProps) {
     } finally {
       setDownloading(null);
     }
-  };
-
-  const aiPrompt = `Analyze this medicine inventory and determine:
-- Which prescribed medicines are already available
-- Possible alternatives based on active ingredients
-- Medicines nearing expiration
-- Potential duplicates
-- Missing emergency essentials
-- Possible medicine interactions
-
-This report is not medical advice.`;
-
-  const copyPrompt = () => {
-    navigator.clipboard.writeText(aiPrompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast(t('copied'));
   };
 
   const isDisabled = !!sharing || !!downloading;
@@ -183,45 +165,6 @@ This report is not medical advice.`;
             );
           })}
         </div>
-      </motion.div>
-
-      {/* AI Analysis Prompt Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card className="border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              {t('aiPromptTitle')}
-            </CardTitle>
-            <CardDescription>{t('aiPromptDesc')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg text-sm font-mono whitespace-pre-wrap">
-              {aiPrompt}
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={copyPrompt}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 me-2" />
-                  {t('copied')}
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 me-2" />
-                  {t('copyPrompt')}
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
       </motion.div>
     </div>
   );
