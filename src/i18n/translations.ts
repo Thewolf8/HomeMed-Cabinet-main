@@ -257,9 +257,6 @@ export const translations = {
     enableAnimationsDesc: 'Disable for better performance on low-end devices',
     
     // AI Prompt Footer
-    aiPromptTitle: 'AI Analysis Prompt',
-    aiPromptDesc: 'Copy this prompt and your export to analyze with your preferred AI assistant.',
-    copyPrompt: 'Copy Prompt',
     copied: 'Copied!',
 
     // Notifications settings
@@ -687,9 +684,6 @@ export const translations = {
     enableAnimationsDesc: 'أوقفها لأداء أفضل على الأجهزة الضعيفة',
     
     // AI Prompt Footer
-    aiPromptTitle: 'موجه تحليل الذكاء الاصطناعي',
-    aiPromptDesc: 'انسخ هذا الموجه وتصديرك للتحليل باستخدام مساعد الذكاء الاصطناعي المفضل لديك.',
-    copyPrompt: 'نسخ الموجه',
     copied: 'تم النسخ!',
 
     // Notifications settings
@@ -1092,9 +1086,6 @@ export const translations = {
     done: 'Terminé',
     
     // AI Prompt Footer
-    aiPromptTitle: 'Prompt d\'Analyse IA',
-    aiPromptDesc: 'Copiez ce prompt et votre export pour analyser avec votre assistant IA préféré.',
-    copyPrompt: 'Copier le Prompt',
     copied: 'Copié!',
     
     // Appearance themes
