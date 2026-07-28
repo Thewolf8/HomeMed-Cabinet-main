@@ -33,9 +33,7 @@ function IllustrationWelcome() {
   return (
     <div className="relative flex items-center justify-center w-full h-52">
       {/* Central cabinet */}
-      <div className="w-28 h-28 rounded-[28px] bg-primary/10 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/10">
-        <AppLogo className="w-14 h-14 text-primary" />
-      </div>
+      <AppLogo className="w-28 h-28" />
 
       {/* Floating medicine cards */}
       <div className="absolute top-5 left-8 w-14 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center gap-1.5">

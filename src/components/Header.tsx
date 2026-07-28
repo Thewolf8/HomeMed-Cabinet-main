@@ -26,9 +26,7 @@ export default function Header({ currentPage }: HeaderProps) {
         {/* Left — logo + page title */}
         <div className="flex items-center gap-3">
           <div className="md:hidden flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <AppLogo className="w-4 h-4 text-primary" />
-            </div>
+            <AppLogo className="w-8 h-8" />
             <span className="font-bold text-sm">{t('appName')}</span>
           </div>
           <h2 className="text-lg font-semibold hidden md:block">
