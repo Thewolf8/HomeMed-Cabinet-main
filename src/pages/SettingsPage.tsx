@@ -671,9 +671,7 @@ export default function SettingsPage({
         {/* About */}
         <Card>
           <CardContent className="p-6 text-center">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <AppLogo className="w-6 h-6 text-primary" />
-            </div>
+            <AppLogo className="w-12 h-12 mx-auto mb-3" />
             <h3 className="font-bold text-lg">{t('appName')}</h3>
             <p className="text-sm text-muted-foreground mt-1">{t('appDescription')}</p>
             <p className="text-xs text-muted-foreground mt-3">
