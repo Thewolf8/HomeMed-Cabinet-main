@@ -5,7 +5,7 @@ import type { Language } from '@/types/medication';
 
 interface I18nContextType {
   language: Language;
-  effectiveLanguage: 'en' | 'ar' | 'fr';
+  effectiveLanguage: 'en' | 'ar' | 'fr' | 'zh';
   isRTL: boolean;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey) => string;
@@ -16,19 +16,20 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'homemed-language';
 
-function detectSystemLanguage(): 'en' | 'ar' | 'fr' {
+function detectSystemLanguage(): 'en' | 'ar' | 'fr' | 'zh' {
   const lang = navigator.language || (navigator as any).userLanguage || 'en';
   const langCode = lang.toLowerCase().split('-')[0];
   
   if (langCode === 'ar') return 'ar';
   if (langCode === 'fr') return 'fr';
+  if (langCode === 'zh') return 'zh';
   return 'en';
 }
 
 function getStoredLanguage(): Language | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && ['en', 'ar', 'fr', 'system'].includes(stored)) {
+    if (stored && ['en', 'ar', 'fr', 'zh', 'system'].includes(stored)) {
       return stored as Language;
     }
   } catch {
@@ -37,7 +38,7 @@ function getStoredLanguage(): Language | null {
   return null;
 }
 
-function getEffectiveLanguage(lang: Language): 'en' | 'ar' | 'fr' {
+function getEffectiveLanguage(lang: Language): 'en' | 'ar' | 'fr' | 'zh' {
   if (lang === 'system') {
     return detectSystemLanguage();
   }
