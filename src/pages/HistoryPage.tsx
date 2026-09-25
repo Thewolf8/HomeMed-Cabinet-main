@@ -39,6 +39,7 @@ function appLocale(): string {
   const lang = getSettings().language;
   if (lang === 'ar') return 'ar-DZ';   // Algerian Arabic — day/month names in Arabic
   if (lang === 'fr') return 'fr-FR';
+  if (lang === 'zh') return 'zh-TW';   // Traditional Chinese (Taiwan)
   if (lang === 'en') return 'en-US';
   // 'system' — honour the device's own locale
   return (typeof navigator !== 'undefined' && navigator.language) || 'en-US';

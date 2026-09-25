@@ -67,11 +67,12 @@ interface SettingsPageProps {
   toast: any;
 }
 
-const languages: { code: Language; label: 'systemDefault' | 'english' | 'arabic' | 'french'; flag: string; dir: 'ltr' | 'rtl' }[] = [
+const languages: { code: Language; label: 'systemDefault' | 'english' | 'arabic' | 'french' | 'chineseTraditional'; flag: string; dir: 'ltr' | 'rtl' }[] = [
   { code: 'system', label: 'systemDefault', flag: '', dir: 'ltr' },
   { code: 'en', label: 'english', flag: '', dir: 'ltr' },
   { code: 'ar', label: 'arabic', flag: '', dir: 'rtl' },
   { code: 'fr', label: 'french', flag: '', dir: 'ltr' },
+  { code: 'zh', label: 'chineseTraditional', flag: '', dir: 'ltr' },
 ];
 
 const themeOptions: { value: Theme; labelKey: 'themeLight' | 'themeDark' | 'themeSystem'; icon: typeof Sun }[] = [

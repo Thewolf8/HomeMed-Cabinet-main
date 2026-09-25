@@ -43,15 +43,22 @@ const NOTIF_STRINGS = {
     expiredTitle: 'Médicament expiré',
     expiredBody: (name: string, dosage: string) => `${name} (${dosage}) a atteint sa date d'expiration.`,
   },
+  zh: {
+    expiringSoonTitle: '藥品即將過期',
+    expiringSoonBody: (name: string, dosage: string, days: number) =>
+      `${name}（${dosage}）將於 ${days} 天後過期。`,
+    expiredTitle: '藥品已過期',
+    expiredBody: (name: string, dosage: string) => `${name}（${dosage}）已到達有效期限。`,
+  },
 } as const;
 
 function notifStrings() {
   let lang = getSettings().language;
   if (lang === 'system') {
     const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
-    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : 'en';
+    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : nav.startsWith('zh') ? 'zh' : 'en';
   }
-  if (lang === 'ar' || lang === 'fr') return NOTIF_STRINGS[lang];
+  if (lang === 'ar' || lang === 'fr' || lang === 'zh') return NOTIF_STRINGS[lang];
   return NOTIF_STRINGS.en;
 }
 
@@ -80,15 +87,22 @@ const LOW_STOCK_STRINGS = {
         ? `${name} (${dosage}) est en rupture de stock.`
         : `${name} (${dosage}) — il ne reste que ${qty}.`,
   },
+  zh: {
+    title: '庫存偏低',
+    body: (name: string, dosage: string, qty: number) =>
+      qty <= 0
+        ? `${name}（${dosage}）已無庫存。`
+        : `${name}（${dosage}）——僅剩 ${qty} 份。`,
+  },
 } as const;
 
 function lowStockStrings() {
   let lang = getSettings().language;
   if (lang === 'system') {
     const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
-    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : 'en';
+    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : nav.startsWith('zh') ? 'zh' : 'en';
   }
-  if (lang === 'ar' || lang === 'fr') return LOW_STOCK_STRINGS[lang];
+  if (lang === 'ar' || lang === 'fr' || lang === 'zh') return LOW_STOCK_STRINGS[lang];
   return LOW_STOCK_STRINGS.en;
 }
 

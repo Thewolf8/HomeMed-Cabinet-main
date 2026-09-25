@@ -88,15 +88,22 @@ const STRINGS = {
     no: 'Pas encore',
     snoozeBody: (name: string) => `Rappel : avez-vous pris ${name} ?`,
   },
+  zh: {
+    title: '您服藥了嗎？',
+    body: (name: string) => `該服用 ${name} 了。`,
+    yes: '是，已服用',
+    no: '尚未',
+    snoozeBody: (name: string) => `提醒：您服用 ${name} 了嗎？`,
+  },
 } as const;
 
 function strings() {
   let lang = getSettings().language;
   if (lang === 'system') {
     const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
-    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : 'en';
+    lang = nav.startsWith('ar') ? 'ar' : nav.startsWith('fr') ? 'fr' : nav.startsWith('zh') ? 'zh' : 'en';
   }
-  if (lang === 'ar' || lang === 'fr') return STRINGS[lang];
+  if (lang === 'ar' || lang === 'fr' || lang === 'zh') return STRINGS[lang];
   return STRINGS.en;
 }
 

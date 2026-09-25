@@ -240,7 +240,7 @@ export interface NotificationPreferences {
   daysBeforeExpiry: number;
 }
 
-export type Language = 'en' | 'ar' | 'fr' | 'system';
+export type Language = 'en' | 'ar' | 'fr' | 'zh' | 'system';
 export type Theme = 'dark' | 'light' | 'system';
 
 export interface BackupPreferences {
